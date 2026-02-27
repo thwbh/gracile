@@ -14,11 +14,12 @@ body:
     validations:
       required: true
 
-  - type: dropdown
+  - type: input
     id: version
     attributes:
       label: Version
       description: Which version of gracile are you using?
+      placeholder: "0.1.0"
     validations:
       required: true
 

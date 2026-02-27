@@ -1,5 +1,12 @@
 ![gracile banner](gracile-banner.png)
 
+[![Crates.io](https://img.shields.io/crates/v/gracile.svg)](https://crates.io/crates/gracile)
+[![npm](https://img.shields.io/npm/v/%40gracile-rs%2Fwasm.svg)](https://www.npmjs.com/package/@gracile-rs/wasm)
+[![Documentation](https://docs.rs/gracile/badge.svg)](https://docs.rs/gracile)
+[![codecov](https://codecov.io/gh/thwbh/gracile/branch/main/graph/badge.svg)](https://codecov.io/gh/thwbh/gracile)
+[![CI](https://github.com/thwbh/gracile/actions/workflows/ci.yaml/badge.svg)](https://github.com/thwbh/gracile/actions/workflows/ci.yaml)
+
+
 # gracile
 
 A polyglot templating engine with [Svelte](https://svelte.dev)-inspired syntax. Write a template once — render it from Rust, the command line, or any JavaScript runtime with identical output. Not fast, but elegant.
