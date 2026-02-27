@@ -1,0 +1,77 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: [bug]
+body:
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      description: Which module does this relate to?
+      options:
+        - cli
+        - core
+        - wasm
+    validations:
+      required: true
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: Version
+      description: Which version of gracile are you using?
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Please provide your environment details
+      placeholder: |
+        OS: macOS 14.0 / Windows 11 / Ubuntu 22.04
+        Rust: 1.77.0
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Please provide a detailed description of the bug
+      placeholder: Describe the bug you encountered, including expected vs actual behavior...
+    validations:
+      required: true
+
+  - type: textarea
+    id: code
+    attributes:
+      label: Code Sample
+      description: Provide relevant Rust code that demonstrates the issue
+      placeholder: |
+        ```rust
+        let engine = Engine::new()
+          .with_strict()
+          .with_template_loader(|name| {
+            std::fs::read_to_string(format!("templates/{}", name))
+              .map_err(|e| gracile_core::Error::RenderError {
+                  message: e.to_string(),
+              })
+          })
+        .register_filter("shout", |val, _args| {
+          match val {
+            Value::String(s) => Ok(Value::String(format!("{}!!!", s.to_uppercase()))),
+            other => Ok(other),
+          }
+        });
+
+        let mut ctx = HashMap::new();
+        ctx.insert("title".into(), Value::from("hello world"));
+
+        let output = engine.render("{title | shout}", ctx)?;
+        ```
+      render: markdown
+    validations:
+      required: false
+
+  

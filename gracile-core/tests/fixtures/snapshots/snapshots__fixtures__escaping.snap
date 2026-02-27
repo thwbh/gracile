@@ -1,0 +1,6 @@
+---
+source: gracile-core/tests/fixtures/mod.rs
+expression: output
+---
+<p class="safe">&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;</p>
+<div class="raw"><em>emphasis</em></div>

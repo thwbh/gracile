@@ -1,0 +1,8 @@
+{#snippet card(title, body)}
+<div class="card">
+  <h2>{title}</h2>
+  <p>{body}</p>
+</div>
+{/snippet}
+{@render card("Welcome", "Thanks for visiting.")}
+{@render card("Latest News", "Nothing to report today.")}

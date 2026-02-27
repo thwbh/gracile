@@ -1,0 +1,10 @@
+[package]
+name = "gracile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "A polyglot template engine — identical rendering across Rust, CLI, and any JavaScript runtime"
+
+[dependencies]
+gracile-core = { path = "../gracile-core", version = "0.1" }

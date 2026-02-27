@@ -1,0 +1,14 @@
+<table>
+  <thead>
+    <tr><th>Name</th><th>Price</th><th>Stock</th></tr>
+  </thead>
+  <tbody>
+{#each products as { name, price, in_stock }}
+    <tr>
+      <td>{name}</td>
+      <td>{price}</td>
+      <td>{in_stock ? "In stock" : "Out of stock"}</td>
+    </tr>
+{/each}
+  </tbody>
+</table>

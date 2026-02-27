@@ -1,0 +1,36 @@
+name: Issue Labeler
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  label-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Apply module label based on issue form
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+            let label = null;
+
+            if (body.includes('### Module\n\ncli')) {
+              label = 'module:cli';
+            } else if (body.includes('### Module\n\ncore')) {
+              label = 'module:core';
+            } else if (body.includes('### Module\n\nwasm')) {
+              label = 'module:wasm';
+            }
+
+            if (label) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: [label]
+              });
+            }

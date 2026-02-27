@@ -1,0 +1,9 @@
+{#if score >= 90}
+<span class="grade a">A</span>
+{:else if score >= 80}
+<span class="grade b">B</span>
+{:else if score >= 70}
+<span class="grade c">C</span>
+{:else}
+<span class="grade f">Fail</span>
+{/if}

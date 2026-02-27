@@ -1,0 +1,15 @@
+# Rust build artifacts
+/target
+
+/docs
+
+# wasm-pack output
+gracile-wasm/pkg
+
+# macOS metadata
+.DS_Store
+
+# Editor directories
+.idea
+.vscode
+*.iml

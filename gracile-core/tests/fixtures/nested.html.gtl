@@ -1,0 +1,8 @@
+{#each groups as group}
+<div class="group">
+  <h2>{group.name}</h2>
+{#each group.members as member, i}
+  <p>{i}: {member.name} — {member.role | default("member")}</p>
+{/each}
+</div>
+{/each}

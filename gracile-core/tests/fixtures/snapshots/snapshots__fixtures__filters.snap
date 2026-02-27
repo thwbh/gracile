@@ -1,0 +1,13 @@
+---
+source: gracile-core/tests/fixtures/mod.rs
+expression: output
+---
+<ul>
+  <li>HELLO WORLD</li>
+  <li>Hello world</li>
+  <li>This is a rather ...</li>
+  <li>rust, web, templates</li>
+  <li>1.23</li>
+  <li>N/A</li>
+  <li>rust / templates (3 total)</li>
+</ul>

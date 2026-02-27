@@ -1,0 +1,14 @@
+[package]
+name = "gracile-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core engine for the Gracile templating language — lexer, parser, AST, and renderer"
+
+[lib]
+
+[dependencies]
+
+[dev-dependencies]
+insta = "1.46.3"

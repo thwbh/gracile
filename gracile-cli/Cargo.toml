@@ -1,0 +1,16 @@
+[package]
+name = "gracile-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Command-line interface for the Gracile templating engine"
+
+[[bin]]
+name = "gracile"
+path = "src/main.rs"
+
+[dependencies]
+gracile-core = { path = "../gracile-core" }
+clap = { version = "4", features = ["derive"] }
+serde_json = "1"
