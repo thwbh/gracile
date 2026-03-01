@@ -1,8 +1,0 @@
-<html>
-  {@include "head"}
-  <body>
-    <div>
-      <h1>Hello {user.name}!</h1>
-    </div>
-  </body>
-</html>

@@ -1,0 +1,12 @@
+---
+source: gracile-core/tests/fixtures/rust/mod.rs
+expression: output
+---
+use std::collections::HashMap;
+
+#[serde(rename_all = "camelCase")]
+pub struct User {
+  pub id: i64,
+  pub username: String,
+  pub data: HashMap<String, String>,
+}

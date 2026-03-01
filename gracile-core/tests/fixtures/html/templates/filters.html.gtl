@@ -1,0 +1,9 @@
+<ul>
+  <li>{= name | upper}</li>
+  <li>{= name | lower | capitalize}</li>
+  <li>{= bio | truncate(20)}</li>
+  <li>{= tags | join(", ")}</li>
+  <li>{= score | round(2)}</li>
+  <li>{= missing | default("N/A")}</li>
+  <li>{= tags | first} / {= tags | last} ({= tags | length} total)</li>
+</ul>

@@ -1,0 +1,13 @@
+---
+source: gracile-core/tests/fixtures/html/mod.rs
+expression: output
+---
+<div class="group">
+  <h2>Team A</h2>
+  <p>0: Alice — lead</p>
+  <p>1: Bob — member</p>
+</div>
+<div class="group">
+  <h2>Team B</h2>
+  <p>0: Carol — lead</p>
+</div>

@@ -1,9 +1,0 @@
----
-source: gracile-core/tests/fixtures/mod.rs
-expression: output
----
-<article>
-  <h1>My Article</h1>
-  <p>By Alice (alice@example.com)</p>
-  <footer>Views: 1234 — Rating: 4.5</footer>
-</article>

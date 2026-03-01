@@ -1,0 +1,6 @@
+{! expected: MyInterface<T> !}
+export interface {~ name} {
+{#each fields as field, idx}
+  {= field.serializedName}{#if field.isOptional}?{/if}: {~ field.typescriptType}; // tags: {= field.tags | join(", ")}
+{/each}
+}

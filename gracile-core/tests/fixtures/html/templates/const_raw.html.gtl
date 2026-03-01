@@ -1,0 +1,6 @@
+{@const greeting = "Hello, " + name + "!"}
+<p>{= greeting}</p>
+<pre>{#raw}
+Template syntax: {#if cond} body {/if}
+Each loop: {#each items as item} {item} {/each}
+{/raw}</pre>

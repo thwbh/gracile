@@ -1,0 +1,3 @@
+<p>
+  Aaaah <strong>{= name | shout}</strong>
+</p>
