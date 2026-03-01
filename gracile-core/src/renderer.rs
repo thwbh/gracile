@@ -25,7 +25,7 @@ pub type FilterFn =
 /// let engine = Engine::new()
 ///     .with_template_loader(|name| {
 ///         match name {
-///             "greeting" => Ok("Hello, {name}!".to_string()),
+///             "greeting" => Ok("Hello, {= name}!".to_string()),
 ///             other => Err(gracile_core::Error::RenderError {
 ///                 message: format!("unknown template '{}'", other),
 ///             }),
@@ -49,7 +49,7 @@ pub type LoaderFn = Box<dyn Fn(&str) -> crate::error::Result<String> + Send + Sy
 ///
 /// let mut ctx = HashMap::new();
 /// ctx.insert("name".to_string(), Value::from("World"));
-/// let output = Engine::new().render("Hello, {name}!", ctx).unwrap();
+/// let output = Engine::new().render("Hello, {= name}!", ctx).unwrap();
 /// assert_eq!(output, "Hello, World!");
 /// ```
 /// Signature for user-supplied filter functions.
@@ -130,7 +130,7 @@ impl Engine {
     /// use gracile_core::Engine;
     /// use std::collections::HashMap;
     ///
-    /// # std::fs::write("/tmp/hello.html", "Hello, {name}!").unwrap();
+    /// # std::fs::write("/tmp/hello.html", "Hello, {= name}!").unwrap();
     /// let engine = Engine::new()
     ///     .with_template_loader(|name| {
     ///         std::fs::read_to_string(format!("/tmp/{}", name))
@@ -155,7 +155,7 @@ impl Engine {
     ///
     /// let engine = Engine::new()
     ///     .with_template_loader(|name| match name {
-    ///         "greet" => Ok("Hello, {who}!".to_string()),
+    ///         "greet" => Ok("Hello, {= who}!".to_string()),
     ///         other => Err(gracile_core::Error::RenderError {
     ///             message: format!("unknown template '{}'", other),
     ///         }),
@@ -205,6 +205,62 @@ impl Engine {
     ) -> Result<String> {
         let mut renderer = Renderer::new(self, context);
         renderer.render_template(template)
+    }
+}
+
+// ─── Serde context helpers (feature = "serde") ───────────────────────────────
+
+#[cfg(feature = "serde")]
+fn context_from_serialize<S: serde::Serialize>(ctx: &S) -> Result<HashMap<String, Value>> {
+    let json = serde_json::to_value(ctx).map_err(|e| Error::RenderError {
+        message: e.to_string(),
+    })?;
+    match Value::from(json) {
+        Value::Object(map) => Ok(map),
+        other => Err(Error::RenderError {
+            message: format!(
+                "render context must serialise to a JSON object, got {}",
+                other.type_name()
+            ),
+        }),
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Engine {
+    /// Like [`render`][Engine::render] but accepts any [`serde::Serialize`] value as context.
+    ///
+    /// This allows passing plain Rust structs annotated with `#[derive(Serialize)]`,
+    /// or a [`serde_json::json!`] literal, instead of building a
+    /// `HashMap<String, Value>` by hand.
+    ///
+    /// ```rust
+    /// # use gracile_core::Engine;
+    /// # use serde::Serialize;
+    /// #[derive(Serialize)]
+    /// struct Ctx { name: String }
+    ///
+    /// let out = Engine::new()
+    ///     .render_from("{= name}", &Ctx { name: "World".into() })
+    ///     .unwrap();
+    /// assert_eq!(out, "World");
+    /// ```
+    pub fn render_from<S: serde::Serialize>(&self, source: &str, ctx: &S) -> Result<String> {
+        self.render(source, context_from_serialize(ctx)?)
+    }
+
+    /// Like [`render_name`][Engine::render_name] but accepts any [`serde::Serialize`] as context.
+    pub fn render_name_from<S: serde::Serialize>(&self, name: &str, ctx: &S) -> Result<String> {
+        self.render_name(name, context_from_serialize(ctx)?)
+    }
+
+    /// Like [`render_template`][Engine::render_template] but accepts any [`serde::Serialize`] as context.
+    pub fn render_template_from<S: serde::Serialize>(
+        &self,
+        template: &Template,
+        ctx: &S,
+    ) -> Result<String> {
+        self.render_template(template, context_from_serialize(ctx)?)
     }
 }
 
@@ -286,11 +342,11 @@ impl<'e> Renderer<'e> {
             Node::Comment(_) => Ok(String::new()),
             Node::ExprTag(t) => {
                 let val = self.eval_expr(&t.expr)?;
-                Ok(val.html_escaped())
-            }
-            Node::HtmlTag(t) => {
-                let val = self.eval_expr(&t.expr)?;
-                Ok(val.to_display_string())
+                if t.raw {
+                    Ok(val.to_display_string())
+                } else {
+                    Ok(val.html_escaped())
+                }
             }
             Node::IfBlock(b) => self.render_if(b),
             Node::EachBlock(b) => self.render_each(b),
@@ -340,6 +396,7 @@ impl<'e> Renderer<'e> {
             return Ok(String::new());
         }
 
+        let len = items.len();
         let mut out = String::new();
         for (i, item) in items.iter().enumerate() {
             let mut scope = HashMap::new();
@@ -366,6 +423,14 @@ impl<'e> Renderer<'e> {
             }
             if let Some(idx_name) = &block.index_binding {
                 scope.insert(idx_name.clone(), Value::Int(i as i64));
+            }
+            if let Some(loop_name) = &block.loop_binding {
+                let mut meta = HashMap::new();
+                meta.insert("index".to_string(), Value::Int(i as i64));
+                meta.insert("length".to_string(), Value::Int(len as i64));
+                meta.insert("first".to_string(), Value::Bool(i == 0));
+                meta.insert("last".to_string(), Value::Bool(i == len - 1));
+                scope.insert(loop_name.clone(), Value::Object(meta));
             }
             self.push_scope(scope);
             out.push_str(&self.render_nodes(&block.body)?);
