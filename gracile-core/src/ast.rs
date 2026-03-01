@@ -17,16 +17,17 @@ pub enum Node {
     SnippetBlock(SnippetBlock),
     RawBlock(String),
     RenderTag(RenderTag),
-    HtmlTag(HtmlTag),
     ConstTag(ConstTag),
     IncludeTag(IncludeTag),
     DebugTag(DebugTag),
 }
 
-/// `{expr}` — an interpolated expression (auto-escaped).
+/// `{= expr}` — escaped interpolation; `{~ expr}` — raw/unescaped interpolation.
 #[derive(Debug, Clone)]
 pub struct ExprTag {
     pub expr: Expr,
+    /// `true` → raw output (`{~ expr}`), `false` → HTML-escaped output (`{= expr}`).
+    pub raw: bool,
 }
 
 /// `{#if cond}...{:else if cond}...{:else}...{/if}`
@@ -44,12 +45,14 @@ pub struct IfBranch {
     pub body: Vec<Node>,
 }
 
-/// `{#each expr as pattern, index}...{:else}...{/each}`
+/// `{#each expr as pattern, index, loop}...{:else}...{/each}`
 #[derive(Debug, Clone)]
 pub struct EachBlock {
     pub iterable: Expr,
     pub pattern: Pattern,
     pub index_binding: Option<String>,
+    /// Optional third binding exposing loop metadata: `{ index, length, first, last }`.
+    pub loop_binding: Option<String>,
     pub body: Vec<Node>,
     pub else_body: Option<Vec<Node>>,
 }
@@ -67,12 +70,6 @@ pub struct SnippetBlock {
 pub struct RenderTag {
     pub name: String,
     pub args: Vec<Expr>,
-}
-
-/// `{@html expr}` — raw (unescaped) output.
-#[derive(Debug, Clone)]
-pub struct HtmlTag {
-    pub expr: Expr,
 }
 
 /// `{@const name = expr}`

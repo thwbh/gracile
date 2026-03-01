@@ -150,7 +150,14 @@ impl Parser {
                     self.advance(); // ExprOpen
                     let expr = self.parse_expr()?;
                     self.expect_close()?;
-                    nodes.push(Node::ExprTag(ExprTag { expr }));
+                    nodes.push(Node::ExprTag(ExprTag { expr, raw: false }));
+                }
+
+                TokenKind::ExprOpenRaw => {
+                    self.advance(); // ExprOpenRaw
+                    let expr = self.parse_expr()?;
+                    self.expect_close()?;
+                    nodes.push(Node::ExprTag(ExprTag { expr, raw: true }));
                 }
 
                 TokenKind::BlockOpen => {
@@ -199,8 +206,14 @@ impl Parser {
                 } else {
                     None
                 };
+                let loop_binding = if self.peek_kind() == &TokenKind::Comma {
+                    self.advance(); // `,`
+                    Some(self.expect_ident()?)
+                } else {
+                    None
+                };
                 self.expect_close()?;
-                self.parse_each_block(iterable, pattern, index_binding)
+                self.parse_each_block(iterable, pattern, index_binding, loop_binding)
             }
             TokenKind::KwSnippet => {
                 self.advance(); // `snippet`
@@ -289,6 +302,7 @@ impl Parser {
         iterable: Expr,
         pattern: Pattern,
         index_binding: Option<String>,
+        loop_binding: Option<String>,
     ) -> Result<Node> {
         let body = self.parse_nodes()?;
         let mut else_body: Option<Vec<Node>> = None;
@@ -320,6 +334,7 @@ impl Parser {
             iterable,
             pattern,
             index_binding,
+            loop_binding,
             body,
             else_body,
         }))
@@ -357,12 +372,6 @@ impl Parser {
                 self.expect(&TokenKind::RParen)?;
                 self.expect_close()?;
                 Ok(Node::RenderTag(RenderTag { name, args }))
-            }
-            TokenKind::KwHtml => {
-                self.advance(); // `html`
-                let expr = self.parse_expr()?;
-                self.expect_close()?;
-                Ok(Node::HtmlTag(HtmlTag { expr }))
             }
             TokenKind::KwConst => {
                 self.advance(); // `const`
