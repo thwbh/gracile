@@ -20,7 +20,8 @@ pub enum TokenKind {
     BlockClose,   // {/
     SpecialOpen,  // {@
     CommentOpen,  // {!
-    ExprOpen,     // {  (expression interpolation)
+    ExprOpen,     // {=  (escaped expression interpolation)
+    ExprOpenRaw,  // {~  (raw/unescaped expression interpolation)
 
     // ── Tag closer ────────────────────────────────────────────────────────
     Close,        // }
@@ -34,7 +35,6 @@ pub enum TokenKind {
     KwSnippet,
     KwRaw,
     KwRender,
-    KwHtml,
     KwConst,
     KwInclude,
     KwDebug,
@@ -224,30 +224,57 @@ impl Lexer {
                     tokens.push(mk(TokenKind::CommentOpen, span));
                     self.lex_comment(tokens)?;
                 }
-                other => {
-                    // Expression interpolation: `{` must be immediately followed by a
-                    // valid expression-start character. A lone `{` before whitespace or
-                    // end-of-input is emitted as literal text.
-                    let is_expr = matches!(
-                        other,
-                        Some('a'..='z')
-                            | Some('A'..='Z')
-                            | Some('_')
-                            | Some('0'..='9')
-                            | Some('(')
-                            | Some('[')
-                            | Some('"')
-                            | Some('\'')
-                            | Some('-') // unary negation: {-1} or {-x}
-                    );
-                    if is_expr {
+                Some('=') => {
+                    // `{=` — escaped expression interpolation.
+                    let span = self.span();
+                    self.advance(); // `{`
+                    self.advance(); // `=`
+                    tokens.push(mk(TokenKind::ExprOpen, span));
+                    self.lex_tag(tokens)?;
+                }
+                Some('~') => {
+                    // `{~` — raw (unescaped) expression interpolation.
+                    let span = self.span();
+                    self.advance(); // `{`
+                    self.advance(); // `~`
+                    tokens.push(mk(TokenKind::ExprOpenRaw, span));
+                    self.lex_tag(tokens)?;
+                }
+                Some('\\') => {
+                    // `{\=` → literal `{=`; `{\~` → literal `{~`.
+                    // Any other `{\X` falls through to the bare-`{` branch.
+                    let escaped = self.peek_at(2);
+                    if matches!(escaped, Some('=') | Some('~')) {
                         let span = self.span();
                         self.advance(); // `{`
-                        tokens.push(mk(TokenKind::ExprOpen, span));
-                        self.lex_tag(tokens)?;
+                        self.advance(); // `\`
+                        let sigil = self.advance().unwrap(); // `=` or `~`
+                        let mut text = format!("{{{sigil}");
+                        // absorb further non-`{` characters into the same RawText token
+                        while !self.at_end() && self.peek() != Some('{') {
+                            text.push(self.advance().unwrap());
+                        }
+                        tokens.push(mk(TokenKind::RawText(text), span));
                     } else {
-                        self.lex_raw_text(tokens);
+                        // Bare `{\` not followed by a recognised escape — literal text.
+                        let span = self.span();
+                        self.advance(); // consume `{`
+                        let mut text = String::from("{");
+                        while !self.at_end() && self.peek() != Some('{') {
+                            text.push(self.advance().unwrap());
+                        }
+                        tokens.push(mk(TokenKind::RawText(text), span));
                     }
+                }
+                _ => {
+                    // Bare `{` not followed by a recognised sigil — always literal text.
+                    let span = self.span();
+                    self.advance(); // consume `{`
+                    let mut text = String::from("{");
+                    while !self.at_end() && self.peek() != Some('{') {
+                        text.push(self.advance().unwrap());
+                    }
+                    tokens.push(mk(TokenKind::RawText(text), span));
                 }
             }
         }
@@ -657,7 +684,6 @@ fn keyword_or_ident(s: String) -> TokenKind {
         "snippet" => TokenKind::KwSnippet,
         "raw" => TokenKind::KwRaw,
         "render" => TokenKind::KwRender,
-        "html" => TokenKind::KwHtml,
         "const" => TokenKind::KwConst,
         "include" => TokenKind::KwInclude,
         "debug" => TokenKind::KwDebug,
