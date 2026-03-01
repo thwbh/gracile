@@ -20,11 +20,11 @@ The syntax comes from Svelte — concise, expressive, and already familiar to an
 ## What?
 
 ```
-Hello, {name}!
+Hello, {= name}!
 
 {#if items}
   {#each items as { label, count }}
-    - {label}: {count | default("n/a")}
+    - {= label}: {= count | default("n/a")}
   {/each}
 {:else}
   Nothing here yet.
@@ -32,8 +32,8 @@ Hello, {name}!
 ```
 
 **Expressions & control flow**
-- `{expr}` — interpolation (HTML-escaped by default)
-- `{@html expr}` — raw unescaped output
+- `{= expr}` — interpolation (HTML-escaped)
+- `{~ expr}` — raw unescaped output
 - `{#if} {:else if} {:else} {/if}` — conditionals
 - `{#each items as pat, idx} {:else} {/each}` — loops with destructuring
 - `{#snippet name(params)} {/snippet}` + `{@render name(args)}` — reusable fragments
@@ -63,7 +63,7 @@ ctx.insert("name".into(), Value::String("world".into()));
 
 let output = Engine::new()
     .with_strict()
-    .render("Hello, {name}!", ctx)?;
+    .render("Hello, {= name}!", ctx)?;
 ```
 
 ### CLI
@@ -77,7 +77,7 @@ gracile render template.html --data data.json
 ```js
 import { render } from '@gracile-rs/wasm';
 
-const output = render('Hello, {name}!', { name: 'world' });
+const output = render('Hello, {= name}!', { name: 'world' });
 ```
 
 ## Where?
