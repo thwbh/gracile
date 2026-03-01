@@ -6,8 +6,22 @@ use crate::ast::*;
 use crate::error::{Error, Result};
 use crate::value::{Value, html_escape, urlencode};
 
-// ─── Filter / Loader ──────────────────────────────────────────────────────────
-
+/// Signature for user-supplied filter functions.
+///
+/// Receives the piped value and any parenthesised arguments, returns the
+/// transformed value or an error.
+///
+/// ```rust
+/// use gracile_core::{Engine, Value};
+///
+/// let engine = Engine::new()
+///     .register_filter("shout", |val, _args| {
+///         match val {
+///             Value::String(s) => Ok(Value::String(format!("{}!!!", s.to_uppercase()))),
+///             other => Ok(other),
+///         }
+///     });
+/// ```
 pub type FilterFn =
     Box<dyn Fn(Value, Vec<Value>) -> crate::error::Result<Value> + Send + Sync + 'static>;
 
@@ -39,8 +53,6 @@ pub type FilterFn =
 /// ```
 pub type LoaderFn = Box<dyn Fn(&str) -> crate::error::Result<String> + Send + Sync + 'static>;
 
-// ─── Engine ───────────────────────────────────────────────────────────────────
-
 /// The Gracile templating engine.
 ///
 /// ```rust
@@ -51,22 +63,6 @@ pub type LoaderFn = Box<dyn Fn(&str) -> crate::error::Result<String> + Send + Sy
 /// ctx.insert("name".to_string(), Value::from("World"));
 /// let output = Engine::new().render("Hello, {= name}!", ctx).unwrap();
 /// assert_eq!(output, "Hello, World!");
-/// ```
-/// Signature for user-supplied filter functions.
-///
-/// Receives the piped value and any parenthesised arguments, returns the
-/// transformed value or an error.
-///
-/// ```rust
-/// use gracile_core::{Engine, Value, FilterFn};
-///
-/// let engine = Engine::new()
-///     .register_filter("shout", |val, _args| {
-///         match val {
-///             Value::String(s) => Ok(Value::String(format!("{}!!!", s.to_uppercase()))),
-///             other => Ok(other),
-///         }
-///     });
 /// ```
 pub struct Engine {
     /// Raise an error on undefined variables / properties instead of returning null.
@@ -208,8 +204,6 @@ impl Engine {
     }
 }
 
-// ─── Serde context helpers (feature = "serde") ───────────────────────────────
-
 #[cfg(feature = "serde")]
 fn context_from_serialize<S: serde::Serialize>(ctx: &S) -> Result<HashMap<String, Value>> {
     let json = serde_json::to_value(ctx).map_err(|e| Error::RenderError {
@@ -264,8 +258,7 @@ impl Engine {
     }
 }
 
-// ─── Renderer ─────────────────────────────────────────────────────────────────
-
+/// Internal AST evaluator — walks the template tree and produces rendered output.
 struct Renderer<'e> {
     engine: &'e Engine,
     /// Scope stack: innermost scope is last.
@@ -282,8 +275,6 @@ impl<'e> Renderer<'e> {
             snippets: HashMap::new(),
         }
     }
-
-    // ── Variable lookup ───────────────────────────────────────────────────
 
     fn lookup(&self, name: &str) -> Option<&Value> {
         for scope in self.scopes.iter().rev() {
@@ -311,8 +302,6 @@ impl<'e> Renderer<'e> {
     fn pop_scope(&mut self) {
         self.scopes.pop();
     }
-
-    // ── Template rendering ────────────────────────────────────────────────
 
     fn render_template(&mut self, template: &Template) -> Result<String> {
         // Hoist snippet definitions.
@@ -489,8 +478,6 @@ impl<'e> Renderer<'e> {
         let _ = tag;
         Ok(String::new())
     }
-
-    // ── Expression evaluation ─────────────────────────────────────────────
 
     fn eval_expr(&mut self, expr: &Expr) -> Result<Value> {
         match expr {
@@ -742,8 +729,7 @@ impl<'e> Renderer<'e> {
     }
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
-
+/// Evaluates an `is [not] test_name` expression against a value.
 fn eval_test(val: &Value, test_name: &str, renderer: &Renderer) -> Result<bool> {
     match test_name {
         "defined" => Ok(!matches!(val, Value::Null)),
@@ -779,8 +765,7 @@ fn eval_test(val: &Value, test_name: &str, renderer: &Renderer) -> Result<bool> 
     }
 }
 
-// ─── Membership ───────────────────────────────────────────────────────────────
-
+/// Evaluates a `[not] in collection` expression.
 fn eval_membership(val: &Value, collection: &Value) -> Result<bool> {
     match collection {
         Value::Array(arr) => Ok(arr.contains(val)),
@@ -800,8 +785,6 @@ fn eval_membership(val: &Value, collection: &Value) -> Result<bool> {
         }),
     }
 }
-
-// ─── Comparisons ─────────────────────────────────────────────────────────────
 
 fn values_equal(a: &Value, b: &Value) -> bool {
     match (a, b) {
@@ -856,11 +839,9 @@ fn numeric_op(
     }
 }
 
-// ─── Built-in filters ─────────────────────────────────────────────────────────
-
+/// Dispatch to a built-in filter by name.
 fn apply_filter(val: Value, name: &str, args: Vec<Value>) -> Result<Value> {
     match name {
-        // ── String filters ────────────────────────────────────────────────
         "upper" => {
             let s = require_string(&val, "upper")?;
             Ok(Value::String(s.to_uppercase()))
@@ -908,7 +889,6 @@ fn apply_filter(val: Value, name: &str, args: Vec<Value>) -> Result<Value> {
             Ok(Value::Array(parts))
         }
 
-        // ── Collection filters ────────────────────────────────────────────
         "sort" => {
             let mut arr = require_array(val, "sort")?;
             arr.sort_by(|a, b| compare_values(a, b).unwrap_or(std::cmp::Ordering::Equal));
@@ -955,7 +935,6 @@ fn apply_filter(val: Value, name: &str, args: Vec<Value>) -> Result<Value> {
             Ok(Value::Int(len as i64))
         }
 
-        // ── Formatting filters ────────────────────────────────────────────
         "default" => {
             if val.is_null() {
                 Ok(args.into_iter().next().unwrap_or(Value::Null))
@@ -982,7 +961,6 @@ fn apply_filter(val: Value, name: &str, args: Vec<Value>) -> Result<Value> {
             }
         }
 
-        // ── Escaping filters ──────────────────────────────────────────────
         "urlencode" => {
             let s = require_string(&val, "urlencode")?;
             Ok(Value::String(urlencode(s)))
@@ -997,8 +975,6 @@ fn apply_filter(val: Value, name: &str, args: Vec<Value>) -> Result<Value> {
         }),
     }
 }
-
-// ── Filter argument helpers ───────────────────────────────────────────────────
 
 fn require_string<'a>(val: &'a Value, filter: &str) -> Result<&'a str> {
     match val {

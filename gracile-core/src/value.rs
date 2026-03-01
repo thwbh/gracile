@@ -219,8 +219,6 @@ impl From<HashMap<String, Value>> for Value {
     }
 }
 
-// ── Serde integration (feature = "serde") ────────────────────────────────────
-
 #[cfg(feature = "serde")]
 impl Value {
     /// Convert any [`serde::Serialize`] value into a gracile [`Value`].

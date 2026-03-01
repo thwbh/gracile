@@ -100,8 +100,6 @@ pub enum Pattern {
     Destructure(Vec<String>),
 }
 
-// ─── Expressions ─────────────────────────────────────────────────────────────
-
 /// A Gracile expression.
 #[derive(Debug, Clone)]
 pub enum Expr {

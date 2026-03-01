@@ -9,8 +9,6 @@ pub use error::{Error, Result};
 pub use renderer::{Engine, FilterFn, LoaderFn};
 pub use value::Value;
 
-// ── context! macro ────────────────────────────────────────────────────────────
-
 /// Build a `HashMap<String, Value>` context from key `=>` value pairs.
 ///
 /// The map can be passed directly to [`Engine::render`]. For nested objects,
