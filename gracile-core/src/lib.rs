@@ -9,6 +9,40 @@ pub use error::{Error, Result};
 pub use renderer::{Engine, FilterFn, LoaderFn};
 pub use value::Value;
 
+/// Build a `HashMap<String, Value>` context from key `=>` value pairs.
+///
+/// The map can be passed directly to [`Engine::render`]. For nested objects,
+/// wrap an inner `context!` call in [`Value::from`].
+///
+/// ```rust
+/// use gracile_core::{Engine, Value, context};
+///
+/// let ctx = context! {
+///     name => "Alice",
+///     score => 42,
+///     active => true,
+/// };
+/// let out = Engine::new().render("{= name}: {= score}", ctx).unwrap();
+/// assert_eq!(out, "Alice: 42");
+/// ```
+///
+/// Nested example:
+/// ```rust
+/// use gracile_core::{Value, context};
+///
+/// let ctx = context! {
+///     user => Value::from(context! { name => "Alice", age => 30 }),
+/// };
+/// ```
+#[macro_export]
+macro_rules! context {
+    ($($key:ident => $value:expr),* $(,)?) => {{
+        let mut _map = ::std::collections::HashMap::<::std::string::String, $crate::Value>::new();
+        $(_map.insert(::std::stringify!($key).to_owned(), $crate::Value::from($value));)*
+        _map
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -32,20 +66,20 @@ mod tests {
     #[test]
     fn basic_interpolation() {
         assert_eq!(
-            render("Hello, {name}!", &[("name", Value::from("World"))]),
+            render("Hello, {= name}!", &[("name", Value::from("World"))]),
             "Hello, World!"
         );
     }
 
     #[test]
     fn auto_escape() {
-        let out = render("{s}", &[("s", Value::from("<b>hi</b>"))]);
+        let out = render("{= s}", &[("s", Value::from("<b>hi</b>"))]);
         assert_eq!(out, "&lt;b&gt;hi&lt;/b&gt;");
     }
 
     #[test]
     fn raw_html_tag() {
-        let out = render("{@html s}", &[("s", Value::from("<b>hi</b>"))]);
+        let out = render("{~ s}", &[("s", Value::from("<b>hi</b>"))]);
         assert_eq!(out, "<b>hi</b>");
     }
 
@@ -53,7 +87,7 @@ mod tests {
     fn member_access() {
         let mut obj = HashMap::new();
         obj.insert("name".to_string(), Value::from("Alice"));
-        let out = render("{user.name}", &[("user", Value::Object(obj))]);
+        let out = render("{= user.name}", &[("user", Value::Object(obj))]);
         assert_eq!(out, "Alice");
     }
 
@@ -99,7 +133,7 @@ mod tests {
     #[test]
     fn each_basic() {
         let items = Value::Array(vec![Value::from("a"), Value::from("b"), Value::from("c")]);
-        let out = render("{#each items as item}{item}{/each}", &[("items", items)]);
+        let out = render("{#each items as item}{= item}{/each}", &[("items", items)]);
         assert_eq!(out, "abc");
     }
 
@@ -107,16 +141,29 @@ mod tests {
     fn each_with_index() {
         let items = Value::Array(vec![Value::from("x"), Value::from("y")]);
         let out = render(
-            "{#each items as item, i}{i}:{item} {/each}",
+            "{#each items as item, i}{= i}:{= item} {/each}",
             &[("items", items)],
         );
         assert_eq!(out, "0:x 1:y ");
     }
 
     #[test]
+    fn each_with_loop_metadata() {
+        let items = Value::Array(vec![Value::from("a"), Value::from("b"), Value::from("c")]);
+        let out = render(
+            "{#each items as item, i, loop}{= item}({= loop.index}/{= loop.length},first={= loop.first},last={= loop.last}) {/each}",
+            &[("items", items)],
+        );
+        assert_eq!(
+            out,
+            "a(0/3,first=true,last=false) b(1/3,first=false,last=false) c(2/3,first=false,last=true) "
+        );
+    }
+
+    #[test]
     fn each_else_empty() {
         let out = render(
-            "{#each items as item}{item}{:else}empty{/each}",
+            "{#each items as item}{= item}{:else}empty{/each}",
             &[("items", Value::Array(vec![]))],
         );
         assert_eq!(out, "empty");
@@ -129,7 +176,7 @@ mod tests {
         obj.insert("age".to_string(), Value::Int(30));
         let items = Value::Array(vec![Value::Object(obj)]);
         let out = render(
-            "{#each items as { name, age }}{name}={age}{/each}",
+            "{#each items as { name, age }}{= name}={= age}{/each}",
             &[("items", items)],
         );
         assert_eq!(out, "Alice=30");
@@ -140,7 +187,7 @@ mod tests {
     #[test]
     fn snippet_and_render() {
         let out = render(
-            "{#snippet greet(who)}Hello, {who}!{/snippet}{@render greet(\"World\")}",
+            "{#snippet greet(who)}Hello, {= who}!{/snippet}{@render greet(\"World\")}",
             &[],
         );
         assert_eq!(out, "Hello, World!");
@@ -154,11 +201,27 @@ mod tests {
         assert_eq!(out, "{name} is {#if} not parsed");
     }
 
+    // ── Sigil escapes ──────────────────────────────────────────────────────
+
+    #[test]
+    fn escape_expr_sigil() {
+        // `{\=` outputs a literal `{=` without triggering interpolation.
+        let out = render(r"{\= name}", &[("name", Value::from("Alice"))]);
+        assert_eq!(out, "{= name}");
+    }
+
+    #[test]
+    fn escape_raw_sigil() {
+        // `{\~` outputs a literal `{~` without triggering raw interpolation.
+        let out = render(r"{\~ name}", &[("name", Value::from("Alice"))]);
+        assert_eq!(out, "{~ name}");
+    }
+
     // ── Const tag ─────────────────────────────────────────────────────────
 
     #[test]
     fn const_tag() {
-        let out = render("{@const x = 42}{x}", &[]);
+        let out = render("{@const x = 42}{= x}", &[]);
         assert_eq!(out, "42");
     }
 
@@ -166,20 +229,20 @@ mod tests {
 
     #[test]
     fn ternary() {
-        let out = render("{x > 0 ? \"pos\" : \"non-pos\"}", &[("x", Value::Int(5))]);
+        let out = render("{= x > 0 ? \"pos\" : \"non-pos\"}", &[("x", Value::Int(5))]);
         assert_eq!(out, "pos");
     }
 
     #[test]
     fn nullish_coalesce() {
-        let out = render("{name ?? \"default\"}", &[("name", Value::Null)]);
+        let out = render("{= name ?? \"default\"}", &[("name", Value::Null)]);
         assert_eq!(out, "default");
     }
 
     #[test]
     fn string_concat() {
         let out = render(
-            "{a + \" \" + b}",
+            "{= a + \" \" + b}",
             &[("a", Value::from("Hello")), ("b", Value::from("World"))],
         );
         assert_eq!(out, "Hello World");
@@ -187,7 +250,10 @@ mod tests {
 
     #[test]
     fn arithmetic() {
-        let out = render("{a + b * 2}", &[("a", Value::Int(1)), ("b", Value::Int(3))]);
+        let out = render(
+            "{= a + b * 2}",
+            &[("a", Value::Int(1)), ("b", Value::Int(3))],
+        );
         assert_eq!(out, "7");
     }
 
@@ -201,51 +267,54 @@ mod tests {
 
     #[test]
     fn filter_upper() {
-        let out = render("{s | upper}", &[("s", Value::from("hello"))]);
+        let out = render("{= s | upper}", &[("s", Value::from("hello"))]);
         assert_eq!(out, "HELLO");
     }
 
     #[test]
     fn filter_lower() {
-        let out = render("{s | lower}", &[("s", Value::from("HELLO"))]);
+        let out = render("{= s | lower}", &[("s", Value::from("HELLO"))]);
         assert_eq!(out, "hello");
     }
 
     #[test]
     fn filter_truncate() {
-        let out = render("{s | truncate(5)}", &[("s", Value::from("Hello, World!"))]);
+        let out = render(
+            "{= s | truncate(5)}",
+            &[("s", Value::from("Hello, World!"))],
+        );
         assert_eq!(out, "He...");
     }
 
     #[test]
     fn filter_join() {
         let items = Value::Array(vec![Value::from("a"), Value::from("b"), Value::from("c")]);
-        let out = render("{items | join(\", \")}", &[("items", items)]);
+        let out = render("{= items | join(\", \")}", &[("items", items)]);
         assert_eq!(out, "a, b, c");
     }
 
     #[test]
     fn filter_length() {
-        let out = render("{s | length}", &[("s", Value::from("hello"))]);
+        let out = render("{= s | length}", &[("s", Value::from("hello"))]);
         assert_eq!(out, "5");
     }
 
     #[test]
     fn filter_default() {
-        let out = render("{name | default(\"anon\")}", &[("name", Value::Null)]);
+        let out = render("{= name | default(\"anon\")}", &[("name", Value::Null)]);
         assert_eq!(out, "anon");
     }
 
     #[test]
     fn filter_round() {
-        let out = render("{n | round(2)}", &[("n", Value::Float(1.23456))]);
+        let out = render("{= n | round(2)}", &[("n", Value::Float(1.23456))]);
         assert_eq!(out, "1.23");
     }
 
     #[test]
     fn filter_chain() {
         let out = render(
-            "{s | lower | capitalize}",
+            "{= s | lower | capitalize}",
             &[("s", Value::from("HELLO WORLD"))],
         );
         assert_eq!(out, "Hello world");
@@ -288,10 +357,10 @@ mod tests {
     fn show_error_messages() {
         use std::collections::HashMap as M;
         let cases: &[(&str, &str)] = &[
-            ("unclosed string", r#"Hello {"world}"#),
+            ("unclosed string", r#"Hello {= "world}"#),
             ("unclosed if block", r#"{#if true}hello"#),
             ("bad special tag", r#"{@foo bar}"#),
-            ("unknown filter", r#"{name | shout}"#),
+            ("unknown filter", r#"{= name | shout}"#),
         ];
         for (label, tmpl) in cases {
             let err = Engine::new().render(tmpl, M::new()).unwrap_err();
@@ -299,7 +368,7 @@ mod tests {
         }
         let err = Engine::new()
             .with_strict()
-            .render("{missing}", M::new())
+            .render("{= missing}", M::new())
             .unwrap_err();
         println!("[strict undefined]\n  error: {}\n", err);
     }
@@ -337,7 +406,7 @@ mod tests {
     fn standalone_each_strips_its_line() {
         let items = Value::Array(vec![Value::from("x"), Value::from("y")]);
         let out = render(
-            "list:\n{#each items as item}\n- {item}\n{/each}\ndone",
+            "list:\n{#each items as item}\n- {= item}\n{/each}\ndone",
             &[("items", items)],
         );
         assert_eq!(out, "list:\n- x\n- y\ndone");
@@ -516,7 +585,7 @@ mod tests {
     #[test]
     fn add_two_strings() {
         let out = render(
-            "{a + ' ' + b}",
+            "{= a + ' ' + b}",
             &[("a", Value::from("Hello")), ("b", Value::from("World"))],
         );
         assert_eq!(out, "Hello World");
@@ -524,13 +593,13 @@ mod tests {
 
     #[test]
     fn add_int_and_string_coerces_to_string() {
-        let out = render("{count + ' items'}", &[("count", Value::Int(5))]);
+        let out = render("{= count + ' items'}", &[("count", Value::Int(5))]);
         assert_eq!(out, "5 items");
     }
 
     #[test]
     fn add_null_and_string_coerces() {
-        let out = render("{x + ' end'}", &[("x", Value::Null)]);
+        let out = render("{= x + ' end'}", &[("x", Value::Null)]);
         assert_eq!(out, "null end");
     }
 
@@ -540,7 +609,7 @@ mod tests {
     fn strict_null_property_access_errors() {
         let err = Engine::new()
             .with_strict()
-            .render("{x.y}", ctx(&[("x", Value::Null)]))
+            .render("{= x.y}", ctx(&[("x", Value::Null)]))
             .unwrap_err();
         assert!(err.to_string().contains("null"));
     }
@@ -551,7 +620,7 @@ mod tests {
         obj.insert("a".to_string(), Value::Int(1));
         let err = Engine::new()
             .with_strict()
-            .render("{x.b}", ctx(&[("x", Value::Object(obj))]))
+            .render("{= x.b}", ctx(&[("x", Value::Object(obj))]))
             .unwrap_err();
         assert!(err.to_string().contains("not found"));
     }
@@ -561,7 +630,7 @@ mod tests {
         let arr = Value::Array(vec![Value::Int(1)]);
         let err = Engine::new()
             .with_strict()
-            .render("{a[5]}", ctx(&[("a", arr)]))
+            .render("{= a[5]}", ctx(&[("a", arr)]))
             .unwrap_err();
         assert!(err.to_string().contains("out of bounds"));
     }
@@ -569,13 +638,13 @@ mod tests {
     #[test]
     fn lax_out_of_bounds_returns_null() {
         let arr = Value::Array(vec![Value::Int(1)]);
-        let out = render("{a[5] ?? 'none'}", &[("a", arr)]);
+        let out = render("{= a[5] ?? 'none'}", &[("a", arr)]);
         assert_eq!(out, "none");
     }
 
     #[test]
     fn lax_null_member_returns_null() {
-        let out = render("{x.y ?? 'nil'}", &[("x", Value::Null)]);
+        let out = render("{= x.y ?? 'nil'}", &[("x", Value::Null)]);
         assert_eq!(out, "nil");
     }
 
@@ -583,14 +652,14 @@ mod tests {
     fn member_access_non_object_strict_errors() {
         let err = Engine::new()
             .with_strict()
-            .render("{a.b}", ctx(&[("a", Value::Int(1))]))
+            .render("{= a.b}", ctx(&[("a", Value::Int(1))]))
             .unwrap_err();
         assert!(err.to_string().contains("Cannot access property"));
     }
 
     #[test]
     fn member_access_non_object_lax_is_null() {
-        let out = render("{a.b ?? 'nil'}", &[("a", Value::Int(1))]);
+        let out = render("{= a.b ?? 'nil'}", &[("a", Value::Int(1))]);
         assert_eq!(out, "nil");
     }
 
@@ -599,7 +668,7 @@ mod tests {
     #[test]
     fn division_by_zero_int() {
         let err = Engine::new()
-            .render("{a / 0}", ctx(&[("a", Value::Int(5))]))
+            .render("{= a / 0}", ctx(&[("a", Value::Int(5))]))
             .unwrap_err();
         assert!(err.to_string().contains("Division by zero"));
     }
@@ -607,7 +676,7 @@ mod tests {
     #[test]
     fn division_by_zero_float() {
         let err = Engine::new()
-            .render("{a / 0.0}", ctx(&[("a", Value::Float(1.0))]))
+            .render("{= a / 0.0}", ctx(&[("a", Value::Float(1.0))]))
             .unwrap_err();
         assert!(err.to_string().contains("Division by zero"));
     }
@@ -616,7 +685,7 @@ mod tests {
     fn subtraction_non_numbers_errors() {
         let err = Engine::new()
             .render(
-                "{a - b}",
+                "{= a - b}",
                 ctx(&[("a", Value::from("x")), ("b", Value::from("y"))]),
             )
             .unwrap_err();
@@ -626,7 +695,7 @@ mod tests {
     #[test]
     fn unary_neg_non_number_errors() {
         let err = Engine::new()
-            .render("{-a}", ctx(&[("a", Value::from("x"))]))
+            .render("{= -a}", ctx(&[("a", Value::from("x"))]))
             .unwrap_err();
         assert!(err.to_string().contains("negate"));
     }
@@ -637,7 +706,7 @@ mod tests {
     fn compare_incompatible_types_errors() {
         let err = Engine::new()
             .render(
-                "{a < b}",
+                "{= a < b}",
                 ctx(&[("a", Value::Int(1)), ("b", Value::from("x"))]),
             )
             .unwrap_err();
@@ -648,7 +717,7 @@ mod tests {
     fn compare_strings_lexicographically() {
         assert_eq!(
             render(
-                "{a < b ? 'yes' : 'no'}",
+                "{= a < b ? 'yes' : 'no'}",
                 &[("a", Value::from("abc")), ("b", Value::from("xyz"))]
             ),
             "yes"
@@ -659,7 +728,7 @@ mod tests {
     fn compare_int_and_float() {
         assert_eq!(
             render(
-                "{a >= b ? 'yes' : 'no'}",
+                "{= a >= b ? 'yes' : 'no'}",
                 &[("a", Value::Int(2)), ("b", Value::Float(1.5))]
             ),
             "yes"
@@ -844,21 +913,21 @@ mod tests {
     #[test]
     fn index_negative_wraps() {
         let arr = Value::Array(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
-        assert_eq!(render("{a[-1]}", &[("a", arr)]), "3");
+        assert_eq!(render("{= a[-1]}", &[("a", arr)]), "3");
     }
 
     #[test]
     fn index_object_by_string_key() {
         let mut obj = HashMap::new();
         obj.insert("key".to_string(), Value::from("val"));
-        assert_eq!(render("{o['key']}", &[("o", Value::Object(obj))]), "val");
+        assert_eq!(render("{= o['key']}", &[("o", Value::Object(obj))]), "val");
     }
 
     #[test]
     fn index_non_integer_on_array_errors() {
         let arr = Value::Array(vec![Value::Int(1)]);
         let err = Engine::new()
-            .render("{a['x']}", ctx(&[("a", arr)]))
+            .render("{= a['x']}", ctx(&[("a", arr)]))
             .unwrap_err();
         assert!(err.to_string().contains("integer"));
     }
@@ -867,7 +936,7 @@ mod tests {
     fn index_into_null_strict_errors() {
         let err = Engine::new()
             .with_strict()
-            .render("{a[0]}", ctx(&[("a", Value::Null)]))
+            .render("{= a[0]}", ctx(&[("a", Value::Null)]))
             .unwrap_err();
         assert!(err.to_string().contains("null"));
     }
@@ -875,7 +944,7 @@ mod tests {
     #[test]
     fn index_into_non_collection_errors() {
         let err = Engine::new()
-            .render("{a[0]}", ctx(&[("a", Value::Int(5))]))
+            .render("{= a[0]}", ctx(&[("a", Value::Int(5))]))
             .unwrap_err();
         assert!(err.to_string().contains("Cannot index"));
     }
@@ -886,7 +955,7 @@ mod tests {
     fn each_non_array_errors() {
         let err = Engine::new()
             .render(
-                "{#each x as item}{item}{/each}",
+                "{#each x as item}{= item}{/each}",
                 ctx(&[("x", Value::Int(1))]),
             )
             .unwrap_err();
@@ -896,7 +965,7 @@ mod tests {
     #[test]
     fn each_null_iterable_uses_else() {
         let out = render(
-            "{#each x as item}{item}{:else}empty{/each}",
+            "{#each x as item}{= item}{:else}empty{/each}",
             &[("x", Value::Null)],
         );
         assert_eq!(out, "empty");
@@ -937,14 +1006,14 @@ mod tests {
 
     #[test]
     fn filter_replace() {
-        let out = render("{s | replace('o', '0')}", &[("s", Value::from("foobar"))]);
+        let out = render("{= s | replace('o', '0')}", &[("s", Value::from("foobar"))]);
         assert_eq!(out, "f00bar");
     }
 
     #[test]
     fn filter_split_and_join() {
         let out = render(
-            "{s | split(',') | join(' ')}",
+            "{= s | split(',') | join(' ')}",
             &[("s", Value::from("a,b,c"))],
         );
         assert_eq!(out, "a b c");
@@ -954,68 +1023,74 @@ mod tests {
     fn filter_sort_and_reverse() {
         let arr = Value::Array(vec![Value::from("c"), Value::from("a"), Value::from("b")]);
         assert_eq!(
-            render("{items | sort | join(',')}", &[("items", arr.clone())]),
+            render("{= items | sort | join(',')}", &[("items", arr.clone())]),
             "a,b,c"
         );
         assert_eq!(
-            render("{items | reverse | join(',')}", &[("items", arr)]),
+            render("{= items | reverse | join(',')}", &[("items", arr)]),
             "b,a,c"
         );
     }
 
     #[test]
     fn filter_reverse_string() {
-        assert_eq!(render("{s | reverse}", &[("s", Value::from("abc"))]), "cba");
+        assert_eq!(
+            render("{= s | reverse}", &[("s", Value::from("abc"))]),
+            "cba"
+        );
     }
 
     #[test]
     fn filter_first_and_last() {
         let arr = Value::Array(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
-        assert_eq!(render("{items | first}", &[("items", arr.clone())]), "10");
-        assert_eq!(render("{items | last}", &[("items", arr)]), "30");
+        assert_eq!(render("{= items | first}", &[("items", arr.clone())]), "10");
+        assert_eq!(render("{= items | last}", &[("items", arr)]), "30");
     }
 
     #[test]
     fn filter_first_last_empty_array() {
         // first/last on an empty array returns null, which renders as "null"
         let arr = Value::Array(vec![]);
-        assert_eq!(render("{items | first}", &[("items", arr.clone())]), "null");
-        assert_eq!(render("{items | last}", &[("items", arr)]), "null");
+        assert_eq!(
+            render("{= items | first}", &[("items", arr.clone())]),
+            "null"
+        );
+        assert_eq!(render("{= items | last}", &[("items", arr)]), "null");
     }
 
     #[test]
     fn filter_json() {
         let arr = Value::Array(vec![Value::Int(1), Value::Bool(false), Value::Null]);
-        assert_eq!(render("{v | json}", &[("v", arr)]), "[1,false,null]");
+        assert_eq!(render("{= v | json}", &[("v", arr)]), "[1,false,null]");
     }
 
     #[test]
     fn filter_json_object() {
         let mut obj = HashMap::new();
         obj.insert("x".to_string(), Value::Int(1));
-        // json output contains quotes → use {@html} to bypass auto-escaping
+        // json output contains quotes → use {~ } to bypass auto-escaping
         let out = Engine::new()
-            .render("{@html v | json}", ctx(&[("v", Value::Object(obj))]))
+            .render("{~ v | json}", ctx(&[("v", Value::Object(obj))]))
             .unwrap();
         assert_eq!(out, r#"{"x":1}"#);
     }
 
     #[test]
     fn filter_urlencode() {
-        let out = render("{s | urlencode}", &[("s", Value::from("a b+c"))]);
+        let out = render("{= s | urlencode}", &[("s", Value::from("a b+c"))]);
         assert_eq!(out, "a%20b%2Bc");
     }
 
     #[test]
     fn filter_escape_inside_html_tag() {
-        let out = render("{@html s | escape}", &[("s", Value::from("<b>bold</b>"))]);
+        let out = render("{~ s | escape}", &[("s", Value::from("<b>bold</b>"))]);
         assert_eq!(out, "&lt;b&gt;bold&lt;/b&gt;");
     }
 
     #[test]
     fn filter_unknown_errors() {
         let err = Engine::new()
-            .render("{s | nosuchfilter}", ctx(&[("s", Value::from("x"))]))
+            .render("{= s | nosuchfilter}", ctx(&[("s", Value::from("x"))]))
             .unwrap_err();
         assert!(err.to_string().contains("Unknown filter"));
     }
@@ -1023,13 +1098,13 @@ mod tests {
     #[test]
     fn filter_wrong_type_string_filters() {
         for tmpl in [
-            "{n | upper}",
-            "{n | lower}",
-            "{n | capitalize}",
-            "{n | trim}",
-            "{n | truncate(5)}",
-            "{n | split(',')}",
-            "{n | urlencode}",
+            "{= n | upper}",
+            "{= n | lower}",
+            "{= n | capitalize}",
+            "{= n | trim}",
+            "{= n | truncate(5)}",
+            "{= n | split(',')}",
+            "{= n | urlencode}",
         ] {
             let err = Engine::new()
                 .render(tmpl, ctx(&[("n", Value::Int(1))]))
@@ -1043,7 +1118,12 @@ mod tests {
 
     #[test]
     fn filter_wrong_type_collection_filters() {
-        for tmpl in ["{n | sort}", "{n | join}", "{n | first}", "{n | last}"] {
+        for tmpl in [
+            "{= n | sort}",
+            "{= n | join}",
+            "{= n | first}",
+            "{= n | last}",
+        ] {
             let err = Engine::new()
                 .render(tmpl, ctx(&[("n", Value::from("x"))]))
                 .unwrap_err();
@@ -1057,7 +1137,7 @@ mod tests {
     #[test]
     fn filter_reverse_wrong_type_errors() {
         let err = Engine::new()
-            .render("{n | reverse}", ctx(&[("n", Value::Int(1))]))
+            .render("{= n | reverse}", ctx(&[("n", Value::Int(1))]))
             .unwrap_err();
         assert!(matches!(err, crate::Error::RenderError { .. }));
     }
@@ -1065,7 +1145,7 @@ mod tests {
     #[test]
     fn filter_round_wrong_type_errors() {
         let err = Engine::new()
-            .render("{n | round}", ctx(&[("n", Value::from("x"))]))
+            .render("{= n | round}", ctx(&[("n", Value::from("x"))]))
             .unwrap_err();
         assert!(matches!(err, crate::Error::RenderError { .. }));
     }
@@ -1073,7 +1153,7 @@ mod tests {
     #[test]
     fn filter_length_wrong_type_errors() {
         let err = Engine::new()
-            .render("{n | length}", ctx(&[("n", Value::Int(1))]))
+            .render("{= n | length}", ctx(&[("n", Value::Int(1))]))
             .unwrap_err();
         assert!(matches!(err, crate::Error::RenderError { .. }));
     }
@@ -1083,7 +1163,7 @@ mod tests {
     #[test]
     fn render_name_via_loader() {
         let engine = Engine::new().with_template_loader(|name| match name {
-            "greet" => Ok("Hello, {who}!".to_string()),
+            "greet" => Ok("Hello, {= who}!".to_string()),
             other => Err(crate::Error::RenderError {
                 message: format!("not found: {other}"),
             }),
@@ -1107,7 +1187,7 @@ mod tests {
     #[test]
     fn compile_and_render_template() {
         let engine = Engine::new();
-        let tpl = engine.compile("Hello, {name}!").unwrap();
+        let tpl = engine.compile("Hello, {= name}!").unwrap();
         let mut c = HashMap::new();
         c.insert("name".to_string(), Value::from("World"));
         let out = engine.render_template(&tpl, c).unwrap();
@@ -1118,29 +1198,31 @@ mod tests {
 
     #[test]
     fn lex_unterminated_string_errors() {
-        let err = Engine::new().render("{\"unclosed}", ctx(&[])).unwrap_err();
+        let err = Engine::new()
+            .render("{= \"unclosed}", ctx(&[]))
+            .unwrap_err();
         assert!(matches!(err, crate::Error::LexError { .. }));
     }
 
     #[test]
     fn lex_unknown_escape_errors() {
-        let err = Engine::new().render("{\"\\z\"}", ctx(&[])).unwrap_err();
+        let err = Engine::new().render("{= \"\\z\"}", ctx(&[])).unwrap_err();
         assert!(err.to_string().contains("escape"));
     }
 
     #[test]
     fn lex_unicode_escape() {
         // \u{41} = 'A'
-        assert_eq!(render("{\"\\u{41}\"}", &[]), "A");
+        assert_eq!(render("{= \"\\u{41}\"}", &[]), "A");
         // emoji
-        assert_eq!(render("{\"\\u{1F600}\"}", &[]), "😀");
+        assert_eq!(render("{= \"\\u{1F600}\"}", &[]), "😀");
     }
 
     #[test]
     fn lex_lone_ampersand_errors() {
         let err = Engine::new()
             .render(
-                "{a & b}",
+                "{= a & b}",
                 ctx(&[("a", Value::Int(1)), ("b", Value::Int(2))]),
             )
             .unwrap_err();
@@ -1163,8 +1245,8 @@ mod tests {
 
     #[test]
     fn lex_float_scientific_notation() {
-        assert_eq!(render("{1.5e1}", &[]), "15");
-        assert_eq!(render("{1.0e2}", &[]), "100");
+        assert_eq!(render("{= 1.5e1}", &[]), "15");
+        assert_eq!(render("{= 1.0e2}", &[]), "100");
     }
 
     // ── Parser error paths ────────────────────────────────────────────────
@@ -1185,13 +1267,137 @@ mod tests {
 
     #[test]
     fn parse_array_literal() {
-        let out = render("{[1, 2, 3] | join(',')}", &[]);
+        let out = render("{= [1, 2, 3] | join(',')}", &[]);
         assert_eq!(out, "1,2,3");
     }
 
     #[test]
     fn parse_nested_array_literal() {
-        let out = render("{['a', 'b', 'c'] | length}", &[]);
+        let out = render("{= ['a', 'b', 'c'] | length}", &[]);
         assert_eq!(out, "3");
+    }
+
+    // ── context! macro ────────────────────────────────────────────────────────
+
+    #[test]
+    fn context_macro_flat() {
+        let ctx = context! { name => "Alice", score => 42_i64, active => true };
+        let out = Engine::new()
+            .render("{= name} {= score} {= active}", ctx)
+            .unwrap();
+        assert_eq!(out, "Alice 42 true");
+    }
+
+    #[test]
+    fn context_macro_nested() {
+        let ctx = context! {
+            user => Value::from(context! { name => "Bob", age => 25_i64 }),
+        };
+        let out = Engine::new()
+            .render("{= user.name} is {= user.age}", ctx)
+            .unwrap();
+        assert_eq!(out, "Bob is 25");
+    }
+
+    // ── Serde feature tests ───────────────────────────────────────────────────
+
+    #[cfg(feature = "serde")]
+    mod serde_tests {
+        use super::*;
+        use serde::Serialize;
+
+        #[test]
+        fn render_from_struct() {
+            #[derive(Serialize)]
+            struct Ctx {
+                name: String,
+                count: u32,
+            }
+            let out = Engine::new()
+                .render_from(
+                    "{= name} ({= count})",
+                    &Ctx {
+                        name: "Widget".into(),
+                        count: 3,
+                    },
+                )
+                .unwrap();
+            assert_eq!(out, "Widget (3)");
+        }
+
+        #[test]
+        fn render_from_json_literal() {
+            let out = Engine::new()
+                .render_from(
+                    "{#each items as item}{= item} {/each}",
+                    &serde_json::json!({ "items": ["a", "b", "c"] }),
+                )
+                .unwrap();
+            assert_eq!(out, "a b c ");
+        }
+
+        #[test]
+        fn value_from_serialize_scalar() {
+            assert_eq!(Value::from_serialize(&42_i32), Value::Int(42));
+            assert_eq!(Value::from_serialize(&true), Value::Bool(true));
+            assert_eq!(Value::from_serialize(&"hello"), Value::from("hello"));
+        }
+
+        #[test]
+        fn value_from_serialize_nested_struct() {
+            #[derive(Serialize)]
+            struct Inner {
+                x: i32,
+            }
+            #[derive(Serialize)]
+            struct Outer {
+                inner: Inner,
+                label: String,
+            }
+            let v = Value::from_serialize(&Outer {
+                inner: Inner { x: 7 },
+                label: "test".into(),
+            });
+            let out = Engine::new()
+                .render(
+                    "{= inner.x} {= label}",
+                    HashMap::from([
+                        (
+                            "inner".to_string(),
+                            match &v {
+                                Value::Object(m) => m["inner"].clone(),
+                                _ => unreachable!(),
+                            },
+                        ),
+                        (
+                            "label".to_string(),
+                            match &v {
+                                Value::Object(m) => m["label"].clone(),
+                                _ => unreachable!(),
+                            },
+                        ),
+                    ]),
+                )
+                .unwrap();
+            assert_eq!(out, "7 test");
+        }
+
+        #[test]
+        fn render_from_rejects_non_object() {
+            let err = Engine::new().render_from("{= x}", &42_i32).unwrap_err();
+            assert!(err.to_string().contains("object"));
+        }
+
+        #[test]
+        fn serde_roundtrip_value() {
+            let original = Value::Object(HashMap::from([
+                ("a".to_string(), Value::Int(1)),
+                ("b".to_string(), Value::Bool(true)),
+                ("c".to_string(), Value::from("hello")),
+            ]));
+            let json = serde_json::to_string(&original).unwrap();
+            let restored: Value = serde_json::from_str(&json).unwrap();
+            assert_eq!(original, restored);
+        }
     }
 }

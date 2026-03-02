@@ -1,0 +1,10 @@
+{#each imports as import}
+use {= import};
+{/each}
+
+#[serde(rename_all = "camelCase")]
+{= accessModifier} struct {= structName} {
+{#each fields as field}
+  {= field.accessModifier} {=field.name}: {~ field.type},
+{/each}
+}

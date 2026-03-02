@@ -4,8 +4,7 @@ use crate::ast::*;
 use crate::error::{Error, Result, Span};
 use crate::lexer::{Token, TokenKind};
 
-// ─── Parser ───────────────────────────────────────────────────────────────────
-
+/// Hand-written recursive descent parser state.
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
@@ -21,8 +20,6 @@ impl Parser {
         self.expect_eof()?;
         Ok(Template { nodes })
     }
-
-    // ── Peek / consume helpers ────────────────────────────────────────────
 
     fn peek(&self) -> &Token {
         &self.tokens[self.pos]
@@ -105,8 +102,6 @@ impl Parser {
         }
     }
 
-    // ── Node list parsing ─────────────────────────────────────────────────
-
     /// Parse nodes until a stop token (`ContinueOpen`, `BlockClose`, or `Eof`),
     /// then apply standalone-tag stripping.
     fn parse_nodes(&mut self) -> Result<Vec<Node>> {
@@ -150,7 +145,14 @@ impl Parser {
                     self.advance(); // ExprOpen
                     let expr = self.parse_expr()?;
                     self.expect_close()?;
-                    nodes.push(Node::ExprTag(ExprTag { expr }));
+                    nodes.push(Node::ExprTag(ExprTag { expr, raw: false }));
+                }
+
+                TokenKind::ExprOpenRaw => {
+                    self.advance(); // ExprOpenRaw
+                    let expr = self.parse_expr()?;
+                    self.expect_close()?;
+                    nodes.push(Node::ExprTag(ExprTag { expr, raw: true }));
                 }
 
                 TokenKind::BlockOpen => {
@@ -176,8 +178,6 @@ impl Parser {
         Ok(nodes)
     }
 
-    // ── Block tags: {# ... } ─────────────────────────────────────────────
-
     fn parse_block(&mut self) -> Result<Node> {
         self.advance(); // BlockOpen
 
@@ -199,8 +199,14 @@ impl Parser {
                 } else {
                     None
                 };
+                let loop_binding = if self.peek_kind() == &TokenKind::Comma {
+                    self.advance(); // `,`
+                    Some(self.expect_ident()?)
+                } else {
+                    None
+                };
                 self.expect_close()?;
-                self.parse_each_block(iterable, pattern, index_binding)
+                self.parse_each_block(iterable, pattern, index_binding, loop_binding)
             }
             TokenKind::KwSnippet => {
                 self.advance(); // `snippet`
@@ -289,6 +295,7 @@ impl Parser {
         iterable: Expr,
         pattern: Pattern,
         index_binding: Option<String>,
+        loop_binding: Option<String>,
     ) -> Result<Node> {
         let body = self.parse_nodes()?;
         let mut else_body: Option<Vec<Node>> = None;
@@ -320,6 +327,7 @@ impl Parser {
             iterable,
             pattern,
             index_binding,
+            loop_binding,
             body,
             else_body,
         }))
@@ -343,8 +351,6 @@ impl Parser {
         Ok(Node::SnippetBlock(SnippetBlock { name, params, body }))
     }
 
-    // ── Special tags: {@ ... } ────────────────────────────────────────────
-
     fn parse_special(&mut self) -> Result<Node> {
         self.advance(); // SpecialOpen
 
@@ -357,12 +363,6 @@ impl Parser {
                 self.expect(&TokenKind::RParen)?;
                 self.expect_close()?;
                 Ok(Node::RenderTag(RenderTag { name, args }))
-            }
-            TokenKind::KwHtml => {
-                self.advance(); // `html`
-                let expr = self.parse_expr()?;
-                self.expect_close()?;
-                Ok(Node::HtmlTag(HtmlTag { expr }))
             }
             TokenKind::KwConst => {
                 self.advance(); // `const`
@@ -395,8 +395,6 @@ impl Parser {
         }
     }
 
-    // ── Patterns ──────────────────────────────────────────────────────────
-
     fn parse_pattern(&mut self) -> Result<Pattern> {
         if self.peek_kind() == &TokenKind::LBraceD {
             self.advance(); // `{`
@@ -420,8 +418,6 @@ impl Parser {
             Ok(Pattern::Ident(self.expect_ident()?))
         }
     }
-
-    // ── Parameter / argument lists ────────────────────────────────────────
 
     fn parse_param_list(&mut self) -> Result<Vec<String>> {
         let mut params = Vec::new();
@@ -454,8 +450,6 @@ impl Parser {
         }
         Ok(args)
     }
-
-    // ── Expression parsing ────────────────────────────────────────────────
 
     fn parse_expr(&mut self) -> Result<Expr> {
         self.parse_filter_expr()
@@ -778,8 +772,6 @@ impl Parser {
         }
     }
 
-    // ── Generic expect ────────────────────────────────────────────────────
-
     fn expect(&mut self, kind: &TokenKind) -> Result<&Token> {
         if std::mem::discriminant(self.peek_kind()) == std::mem::discriminant(kind) {
             Ok(self.advance())
@@ -792,18 +784,17 @@ impl Parser {
     }
 }
 
-// ─── Standalone-line stripping ────────────────────────────────────────────────
-//
-// A block-level tag is "standalone" when:
-//   - the text before it on its line is entirely whitespace (spaces/tabs), and
-//   - the text after it on its line is entirely whitespace (spaces/tabs) + newline.
-//
-// When standalone, the tag's entire line is removed from the output:
-//   - the whitespace prefix is stripped from the preceding raw-text node,
-//   - the trailing newline is stripped from the following raw-text node,
-//   - the opening newline is stripped from the block's first body raw-text node,
-//   - the closing whitespace prefix is stripped from the block's last body raw-text node.
-
+/// Strip standalone block tags from their surrounding lines.
+///
+/// A block-level tag is "standalone" when:
+/// - the text before it on its line is entirely whitespace (spaces/tabs), and
+/// - the text after it on its line is entirely whitespace (spaces/tabs) + newline.
+///
+/// When standalone, the tag's entire line is removed from the output:
+/// - the whitespace prefix is stripped from the preceding raw-text node,
+/// - the trailing newline is stripped from the following raw-text node,
+/// - the opening newline is stripped from the block's first body raw-text node,
+/// - the closing whitespace prefix is stripped from the block's last body raw-text node.
 fn strip_standalone(nodes: &mut Vec<Node>) {
     let len = nodes.len();
     for i in 0..len {
@@ -844,8 +835,6 @@ fn strip_standalone(nodes: &mut Vec<Node>) {
         if !suffix_blank {
             continue;
         }
-
-        // ── Standalone confirmed ──────────────────────────────────────────
 
         // Strip the blank prefix from the preceding raw-text node.
         if i > 0
@@ -978,8 +967,6 @@ fn strip_body_tail(body: &mut Vec<Node>) {
     }
 }
 
-// ─── String helpers ───────────────────────────────────────────────────────────
-
 /// Returns the substring after the last `\n` (or the whole string if none).
 fn after_last_nl(s: &str) -> &str {
     match s.rfind('\n') {
@@ -1015,8 +1002,7 @@ fn strip_through_first_nl(s: &mut String) {
     }
 }
 
-// ─── Public entry point ───────────────────────────────────────────────────────
-
+/// Parse a token stream into a [`Template`] AST.
 pub fn parse(tokens: Vec<Token>) -> Result<Template> {
     Parser::new(tokens).parse()
 }

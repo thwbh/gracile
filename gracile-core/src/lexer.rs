@@ -2,11 +2,9 @@
 
 use crate::error::{Error, Result, Span};
 
-// ─── Token types ─────────────────────────────────────────────────────────────
-
+/// All token variants produced by the lexer.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
-    // ── Template level ────────────────────────────────────────────────────
     /// Verbatim text outside any tag.
     RawText(String),
     /// Content of a raw block (between `{#raw}` and `{/raw}`).
@@ -14,19 +12,17 @@ pub enum TokenKind {
     /// Content of a comment (between `{!` and `!}`).
     CommentBody(String),
 
-    // ── Tag openers ───────────────────────────────────────────────────────
     BlockOpen,    // {#
     ContinueOpen, // {:
     BlockClose,   // {/
     SpecialOpen,  // {@
     CommentOpen,  // {!
-    ExprOpen,     // {  (expression interpolation)
+    ExprOpen,     // {=  (escaped expression interpolation)
+    ExprOpenRaw,  // {~  (raw/unescaped expression interpolation)
 
-    // ── Tag closer ────────────────────────────────────────────────────────
     Close,        // }
     CommentClose, // !}
 
-    // ── Keywords (context-sensitive, inside tags) ─────────────────────────
     KwIf,
     KwElse,
     KwEach,
@@ -34,7 +30,6 @@ pub enum TokenKind {
     KwSnippet,
     KwRaw,
     KwRender,
-    KwHtml,
     KwConst,
     KwInclude,
     KwDebug,
@@ -42,7 +37,6 @@ pub enum TokenKind {
     KwNot,
     KwIn,
 
-    // ── Literals ──────────────────────────────────────────────────────────
     StringLit(String),
     IntLit(i64),
     FloatLit(f64),
@@ -50,10 +44,8 @@ pub enum TokenKind {
     False,
     Null,
 
-    // ── Identifier ────────────────────────────────────────────────────────
     Ident(String),
 
-    // ── Operators ─────────────────────────────────────────────────────────
     Pipe,         // |
     Or,           // ||
     And,          // &&
@@ -75,7 +67,6 @@ pub enum TokenKind {
     Bang,         // ! (unary NOT)
     Dot,          // .
 
-    // ── Punctuation ───────────────────────────────────────────────────────
     LParen,   // (
     RParen,   // )
     LBracket, // [
@@ -94,8 +85,7 @@ pub struct Token {
     pub span: Span,
 }
 
-// ─── Lexer ───────────────────────────────────────────────────────────────────
-
+/// Character-by-character tokenizer.
 pub struct Lexer {
     chars: Vec<char>,
     pos: usize,
@@ -125,8 +115,6 @@ impl Lexer {
         });
         Ok(tokens)
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────
 
     fn span(&self) -> Span {
         Span::new(self.line, self.col, self.offset)
@@ -171,8 +159,6 @@ impl Lexer {
     fn at_end(&self) -> bool {
         self.pos >= self.chars.len()
     }
-
-    // ── Template-mode lexing ─────────────────────────────────────────────
 
     fn lex_template(&mut self, tokens: &mut Vec<Token>) -> Result<()> {
         while !self.at_end() {
@@ -224,30 +210,57 @@ impl Lexer {
                     tokens.push(mk(TokenKind::CommentOpen, span));
                     self.lex_comment(tokens)?;
                 }
-                other => {
-                    // Expression interpolation: `{` must be immediately followed by a
-                    // valid expression-start character. A lone `{` before whitespace or
-                    // end-of-input is emitted as literal text.
-                    let is_expr = matches!(
-                        other,
-                        Some('a'..='z')
-                            | Some('A'..='Z')
-                            | Some('_')
-                            | Some('0'..='9')
-                            | Some('(')
-                            | Some('[')
-                            | Some('"')
-                            | Some('\'')
-                            | Some('-') // unary negation: {-1} or {-x}
-                    );
-                    if is_expr {
+                Some('=') => {
+                    // `{=` — escaped expression interpolation.
+                    let span = self.span();
+                    self.advance(); // `{`
+                    self.advance(); // `=`
+                    tokens.push(mk(TokenKind::ExprOpen, span));
+                    self.lex_tag(tokens)?;
+                }
+                Some('~') => {
+                    // `{~` — raw (unescaped) expression interpolation.
+                    let span = self.span();
+                    self.advance(); // `{`
+                    self.advance(); // `~`
+                    tokens.push(mk(TokenKind::ExprOpenRaw, span));
+                    self.lex_tag(tokens)?;
+                }
+                Some('\\') => {
+                    // `{\=` → literal `{=`; `{\~` → literal `{~`.
+                    // Any other `{\X` falls through to the bare-`{` branch.
+                    let escaped = self.peek_at(2);
+                    if matches!(escaped, Some('=') | Some('~')) {
                         let span = self.span();
                         self.advance(); // `{`
-                        tokens.push(mk(TokenKind::ExprOpen, span));
-                        self.lex_tag(tokens)?;
+                        self.advance(); // `\`
+                        let sigil = self.advance().unwrap(); // `=` or `~`
+                        let mut text = format!("{{{sigil}");
+                        // absorb further non-`{` characters into the same RawText token
+                        while !self.at_end() && self.peek() != Some('{') {
+                            text.push(self.advance().unwrap());
+                        }
+                        tokens.push(mk(TokenKind::RawText(text), span));
                     } else {
-                        self.lex_raw_text(tokens);
+                        // Bare `{\` not followed by a recognised escape — literal text.
+                        let span = self.span();
+                        self.advance(); // consume `{`
+                        let mut text = String::from("{");
+                        while !self.at_end() && self.peek() != Some('{') {
+                            text.push(self.advance().unwrap());
+                        }
+                        tokens.push(mk(TokenKind::RawText(text), span));
                     }
+                }
+                _ => {
+                    // Bare `{` not followed by a recognised sigil — always literal text.
+                    let span = self.span();
+                    self.advance(); // consume `{`
+                    let mut text = String::from("{");
+                    while !self.at_end() && self.peek() != Some('{') {
+                        text.push(self.advance().unwrap());
+                    }
+                    tokens.push(mk(TokenKind::RawText(text), span));
                 }
             }
         }
@@ -264,8 +277,6 @@ impl Lexer {
             tokens.push(mk(TokenKind::RawText(text), span));
         }
     }
-
-    // ── Raw block: {#raw}...{/raw} ───────────────────────────────────────
 
     fn lex_raw_block(&mut self, tokens: &mut Vec<Token>) -> Result<()> {
         let open_span = self.span();
@@ -304,8 +315,6 @@ impl Lexer {
         tokens.push(mk(TokenKind::Close, close_span));
         Ok(())
     }
-
-    // ── Tag-mode lexing ──────────────────────────────────────────────────
 
     /// Tokenise the contents of a tag until the matching `}`.
     /// Tracks brace depth so that destructuring patterns like `{ name, age }`
@@ -350,8 +359,6 @@ impl Lexer {
         }
     }
 
-    // ── Comment-mode lexing ──────────────────────────────────────────────
-
     fn lex_comment(&mut self, tokens: &mut Vec<Token>) -> Result<()> {
         let body_span = self.span();
         let mut body = String::new();
@@ -373,8 +380,6 @@ impl Lexer {
             body.push(self.advance().unwrap());
         }
     }
-
-    // ── Token-level helpers ───────────────────────────────────────────────
 
     fn skip_ws(&mut self) {
         while matches!(
@@ -642,8 +647,6 @@ impl Lexer {
     }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 fn mk(kind: TokenKind, span: Span) -> Token {
     Token { kind, span }
 }
@@ -657,7 +660,6 @@ fn keyword_or_ident(s: String) -> TokenKind {
         "snippet" => TokenKind::KwSnippet,
         "raw" => TokenKind::KwRaw,
         "render" => TokenKind::KwRender,
-        "html" => TokenKind::KwHtml,
         "const" => TokenKind::KwConst,
         "include" => TokenKind::KwInclude,
         "debug" => TokenKind::KwDebug,
@@ -671,8 +673,7 @@ fn keyword_or_ident(s: String) -> TokenKind {
     }
 }
 
-// ─── Public entry point ───────────────────────────────────────────────────────
-
+/// Tokenise a template source string and return the flat token stream.
 pub fn tokenize(src: &str) -> Result<Vec<Token>> {
     Lexer::new(src).tokenize()
 }

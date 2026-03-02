@@ -1,0 +1,7 @@
+<ul>
+{#each items as item, i}
+  <li>{= i}. {= item}</li>
+{:else}
+  <li>No items available.</li>
+{/each}
+</ul>

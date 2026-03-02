@@ -5,6 +5,8 @@ use std::fmt;
 
 /// A runtime value in the Gracile template engine.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum Value {
     Null,
     Bool(bool),
@@ -214,5 +216,41 @@ impl From<Vec<Value>> for Value {
 impl From<HashMap<String, Value>> for Value {
     fn from(m: HashMap<String, Value>) -> Self {
         Value::Object(m)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Value {
+    /// Convert any [`serde::Serialize`] value into a gracile [`Value`].
+    ///
+    /// This is the bridge between Rust's type system and the template engine.
+    /// It goes through [`serde_json`] as an intermediate, so any type that
+    /// serialises to a JSON object can be used as a render context.
+    pub fn from_serialize<T: serde::Serialize>(val: &T) -> Self {
+        serde_json::to_value(val)
+            .map(Into::into)
+            .unwrap_or(Value::Null)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl From<serde_json::Value> for Value {
+    fn from(v: serde_json::Value) -> Self {
+        match v {
+            serde_json::Value::Null => Value::Null,
+            serde_json::Value::Bool(b) => Value::Bool(b),
+            serde_json::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    Value::Int(i)
+                } else {
+                    Value::Float(n.as_f64().unwrap_or(f64::NAN))
+                }
+            }
+            serde_json::Value::String(s) => Value::String(s),
+            serde_json::Value::Array(a) => Value::Array(a.into_iter().map(Into::into).collect()),
+            serde_json::Value::Object(o) => {
+                Value::Object(o.into_iter().map(|(k, v)| (k, v.into())).collect())
+            }
+        }
     }
 }

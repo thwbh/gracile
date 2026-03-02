@@ -1,0 +1,16 @@
+---
+source: gracile-core/tests/fixtures/gracile/mod.rs
+expression: output
+---
+{! Auto-generated detail view for: Article (3 fields) — do not edit !}
+<article class="article-detail">
+  <h1>{= article.title }</h1>
+  <section class="fields">
+<h2>{= article.headline }</h2>
+    <hr>
+<div class="body">{~ article.body }</div>
+    <hr>
+{#if article.summary}
+<p class="summary">{= article.summary }</p>
+{/if}  </section>
+</article>

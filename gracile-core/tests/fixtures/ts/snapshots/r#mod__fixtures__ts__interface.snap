@@ -1,0 +1,8 @@
+---
+source: gracile-core/tests/fixtures/ts/mod.rs
+expression: output
+---
+export interface MyInterface {                  
+  name?: string; // tags: text, personal
+  id: number; // tags: numeric, unique
+}

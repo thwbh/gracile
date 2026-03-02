@@ -1,0 +1,7 @@
+---
+source: gracile-core/tests/fixtures/html/mod.rs
+expression: output
+---
+<p>
+  Aaaah <strong>ALICE!!!</strong>
+</p>

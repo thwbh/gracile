@@ -1,2 +1,0 @@
-<p class="safe">{user_input}</p>
-<div class="raw">{@html html_content}</div>

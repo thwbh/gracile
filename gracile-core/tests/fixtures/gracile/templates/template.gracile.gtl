@@ -1,0 +1,32 @@
+{! Meta-template: generates a gracile detail-view template for "{= name}"  !}
+{! ─────────────────────────────────────────────────────────────────────── !}
+{! Expected context:                                                        !}
+{!   name    (string) — entity name, e.g. "Article"                        !}
+{!   varName (string) — context variable in the generated template          !}
+{!   fields  (array)  — {name, label, tag, class?, isHtml, optional}       !}
+{! Compute field count once for use in the generated-template header. !}
+{@const fieldCount = fields | length}
+{! ── Snippet: emits one field element into the generated template ──────── !}
+{! Optional fields are guarded by a {#if}/{/if} pair in the output.        !}
+{#snippet field_element(field)}
+{#if field.optional}
+{#raw}{#if {/raw}{= varName}.{= field.name}{#raw}}{/raw}
+{/if}
+<{= field.tag}{#if field.class} class="{= field.class}"{/if}>{#if field.isHtml}{\~ {= varName}.{= field.name} }{:else}{\= {= varName}.{= field.name} }{/if}</{= field.tag}>
+{#if field.optional}
+{#raw}{/if}{/raw}
+{/if}
+{/snippet}
+{! ── Generated template starts here ────────────────────────────────────── !}
+{#raw}{! Auto-generated detail view for: {/raw}{= name}{#raw} ({/raw}{= fieldCount}{#raw} fields) — do not edit !}{/raw}
+<article class="{= varName}-detail">
+  <h1>{\= {= varName}.title }</h1>
+  <section class="fields">
+{#each fields as field, i, loop}
+    {@render field_element(field)}
+{#if !loop.last}
+    <hr>
+{/if}
+{/each}
+  </section>
+</article>

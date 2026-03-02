@@ -1,0 +1,9 @@
+---
+source: gracile-core/tests/fixtures/html/mod.rs
+expression: output
+---
+<ul>
+  <li>0. apple</li>
+  <li>1. banana</li>
+  <li>2. cherry</li>
+</ul>

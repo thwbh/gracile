@@ -1,0 +1,12 @@
+---
+source: gracile-core/tests/fixtures/html/mod.rs
+expression: output
+---
+<div class="card">
+  <h2>Welcome</h2>
+  <p>Thanks for visiting.</p>
+</div>
+<div class="card">
+  <h2>Latest News</h2>
+  <p>Nothing to report today.</p>
+</div>

@@ -1,0 +1,14 @@
+---
+source: gracile-core/tests/fixtures/java/mod.rs
+expression: output
+---
+package com.example.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface Repository<T> {
+  public List<T> findAll();
+  public Optional<T> findById(Long id);
+  public void save(T entity);
+}

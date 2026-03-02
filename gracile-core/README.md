@@ -10,17 +10,10 @@ gracile-core = "0.1"
 ```
 
 ```rust
-use gracile_core::{Engine, Value, FilterFn};
-use std::collections::HashMap;
+use gracile_core::{Engine, Value, context};
 
 let engine = Engine::new()
     .with_strict()
-    .with_template_loader(|name| {
-        std::fs::read_to_string(format!("templates/{}", name))
-            .map_err(|e| gracile_core::Error::RenderError {
-                message: e.to_string(),
-            })
-    })
     .register_filter("shout", |val, _args| {
         match val {
             Value::String(s) => Ok(Value::String(format!("{}!!!", s.to_uppercase()))),
@@ -28,11 +21,29 @@ let engine = Engine::new()
         }
     });
 
-let mut ctx = HashMap::new();
-ctx.insert("title".into(), Value::from("hello world"));
+let ctx = context! {
+    title => "hello world"
+};
 
-let output = engine.render("{title | shout}", ctx)?;
+let output = engine.render("{= title | shout}", ctx)?;
 // → "HELLO WORLD!!!"
 ```
+
+## Syntax at a glance
+
+| Syntax | Description |
+|---|---|
+| `{= expr }` | Interpolate (HTML-escaped) |
+| `{~ expr }` | Interpolate raw HTML (unescaped) |
+| `{! comment !}` | Comment, stripped from output |
+| `{#if cond} … {:else} … {/if}` | Conditional |
+| `{#each items as item, i} … {:else} … {/each}` | Loop with optional index |
+| `{#each items as item, i, loop} … {/each}` | Loop with metadata (`loop.index`, `.length`, `.first`, `.last`) |
+| `{#snippet name(params)} … {/snippet}` | Define a reusable snippet |
+| `{@render name(args)}` | Render a snippet |
+| `{@include "name"}` | Inline a pre-registered template |
+| `{@const name = expr}` | Local binding |
+| `{#raw} … {/raw}` | Verbatim block, no parsing |
+| `{\=` / `{\~` | Escape: emit a literal `{=` / `{~` |
 
 Most users should depend on the [`gracile`](../gracile) crate instead, which re-exports this crate's public API under a cleaner name.

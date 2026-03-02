@@ -1,0 +1,5 @@
+<article>
+  <h1>{= title}</h1>
+  <p>By {= author.name} ({= author.email})</p>
+  <footer>Views: {= stats.views} — Rating: {= stats.rating}</footer>
+</article>

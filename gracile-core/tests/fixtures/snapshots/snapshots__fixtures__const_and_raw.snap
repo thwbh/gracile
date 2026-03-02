@@ -1,9 +1,0 @@
----
-source: gracile-core/tests/fixtures/mod.rs
-expression: output
----
-<p>Hello, World!</p>
-<pre>
-Template syntax: {#if cond} body {/if}
-Each loop: {#each items as item} {item} {/each}
-</pre>
