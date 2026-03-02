@@ -31,7 +31,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack,cargo-workspaces
@@ -104,7 +103,7 @@ jobs:
       # crates.io for each crate to be indexed before publishing the next one.
 
       - name: Publish to crates.io
-        run: cargo ws publish --yes --no-verify
+        run: cargo ws publish --publish-as-is --yes
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_TOKEN }}
 
