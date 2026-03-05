@@ -469,7 +469,11 @@ impl<'e> Renderer<'e> {
             .iter()
             .flat_map(|s| s.iter().map(|(k, v)| (k.clone(), v.clone())))
             .collect();
-        self.engine.render(&source, ctx)
+        self.engine
+            .render(&source, ctx)
+            .map_err(|e| Error::RenderError {
+                message: format!("In template '{}': {}", tag.path, e),
+            })
     }
 
     fn render_debug(&self, tag: &DebugTag) -> Result<String> {
