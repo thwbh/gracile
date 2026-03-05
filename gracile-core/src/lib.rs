@@ -320,6 +320,31 @@ mod tests {
         assert_eq!(out, "Hello world");
     }
 
+    #[test]
+    fn filter_tighter_than_comparison() {
+        // The motivating case from issue #4: filter binds tighter than `>`
+        let items = Value::Array(vec![Value::Int(1), Value::Int(2)]);
+        let out = render("{#if items | length > 0}yes{/if}", &[("items", items)]);
+        assert_eq!(out, "yes");
+    }
+
+    #[test]
+    fn filter_tighter_than_equality() {
+        let items = Value::Array(vec![Value::Int(1), Value::Int(2)]);
+        let out = render("{#if items | length == 2}yes{/if}", &[("items", items)]);
+        assert_eq!(out, "yes");
+    }
+
+    #[test]
+    fn filter_applies_to_immediate_operand_not_sum() {
+        // Breaking change: `a + b | upper` now means `a + (b | upper)`, not `(a + b) | upper`
+        let out = render(
+            "{= a + b | upper}",
+            &[("a", Value::from("hello ")), ("b", Value::from("world"))],
+        );
+        assert_eq!(out, "hello WORLD");
+    }
+
     // ── is tests ──────────────────────────────────────────────────────────
 
     #[test]
