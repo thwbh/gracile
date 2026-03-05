@@ -1,4 +1,4 @@
-![gracile-wasm](gracile-wasm.png)
+![gracile-wasm](https://raw.githubusercontent.com/thwbh/gracile/main/gracile-wasm/gracile-wasm.png)
 
 # @gracile-rs/wasm
 
