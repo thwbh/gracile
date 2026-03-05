@@ -452,33 +452,7 @@ impl Parser {
     }
 
     fn parse_expr(&mut self) -> Result<Expr> {
-        self.parse_filter_expr()
-    }
-
-    fn parse_filter_expr(&mut self) -> Result<Expr> {
-        let expr = self.parse_ternary()?;
-        let mut filters = Vec::new();
-        while self.peek_kind() == &TokenKind::Pipe {
-            self.advance();
-            let name = self.expect_ident()?;
-            let args = if self.peek_kind() == &TokenKind::LParen {
-                self.advance();
-                let a = self.parse_arg_list()?;
-                self.expect(&TokenKind::RParen)?;
-                a
-            } else {
-                Vec::new()
-            };
-            filters.push(FilterApplication { name, args });
-        }
-        if filters.is_empty() {
-            Ok(expr)
-        } else {
-            Ok(Expr::Filter {
-                expr: Box::new(expr),
-                filters,
-            })
-        }
+        self.parse_ternary()
     }
 
     fn parse_ternary(&mut self) -> Result<Expr> {
@@ -703,6 +677,22 @@ impl Parser {
                     expr = Expr::IndexAccess {
                         object: Box::new(expr),
                         index: Box::new(index),
+                    };
+                }
+                TokenKind::Pipe => {
+                    self.advance();
+                    let name = self.expect_ident()?;
+                    let args = if self.peek_kind() == &TokenKind::LParen {
+                        self.advance();
+                        let a = self.parse_arg_list()?;
+                        self.expect(&TokenKind::RParen)?;
+                        a
+                    } else {
+                        Vec::new()
+                    };
+                    expr = Expr::Filter {
+                        expr: Box::new(expr),
+                        filters: vec![FilterApplication { name, args }],
                     };
                 }
                 _ => break,
