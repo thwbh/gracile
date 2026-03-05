@@ -34,7 +34,6 @@ pub enum TokenKind {
     KwInclude,
     KwDebug,
     KwIs,
-    KwNot,
     KwIn,
 
     StringLit(String),
@@ -106,7 +105,6 @@ impl std::fmt::Display for TokenKind {
             TokenKind::KwInclude => "keyword 'include'",
             TokenKind::KwDebug => "keyword 'debug'",
             TokenKind::KwIs => "keyword 'is'",
-            TokenKind::KwNot => "keyword 'not'",
             TokenKind::KwIn => "keyword 'in'",
 
             TokenKind::True => "'true'",
@@ -740,7 +738,6 @@ fn keyword_or_ident(s: String) -> TokenKind {
         "include" => TokenKind::KwInclude,
         "debug" => TokenKind::KwDebug,
         "is" => TokenKind::KwIs,
-        "not" => TokenKind::KwNot,
         "in" => TokenKind::KwIn,
         "true" => TokenKind::True,
         "false" => TokenKind::False,
