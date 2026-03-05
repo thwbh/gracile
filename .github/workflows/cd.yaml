@@ -30,7 +30,8 @@ jobs:
       - uses: swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack,cargo-workspaces
@@ -78,9 +79,13 @@ jobs:
       - name: Build WASM
         run: wasm-pack build gracile-wasm --target bundler --release
 
-      - name: Patch WASM package name
+      - name: Patch WASM package metadata
         run: |
-          jq '.name = "@gracile-rs/wasm"' \
+          jq '
+            .name = "@gracile-rs/wasm" |
+            .homepage = "https://github.com/thwbh/gracile" |
+            .bugs = {"url": "https://github.com/thwbh/gracile/issues"}
+          ' \
             gracile-wasm/pkg/package.json > gracile-wasm/pkg/package.json.tmp
           mv gracile-wasm/pkg/package.json.tmp gracile-wasm/pkg/package.json
  
