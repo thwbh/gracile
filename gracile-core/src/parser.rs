@@ -584,7 +584,7 @@ impl Parser {
         let expr = self.parse_membership()?;
         if self.peek_kind() == &TokenKind::KwIs {
             self.advance();
-            let negated = if self.peek_kind() == &TokenKind::KwNot {
+            let negated = if matches!(self.peek_kind(), TokenKind::Ident(n) if n == "not") {
                 self.advance();
                 true
             } else {
@@ -603,28 +603,26 @@ impl Parser {
 
     fn parse_membership(&mut self) -> Result<Expr> {
         let expr = self.parse_additive()?;
-        match self.peek_kind() {
-            TokenKind::KwIn => {
-                self.advance();
-                let collection = self.parse_additive()?;
-                Ok(Expr::Membership {
-                    expr: Box::new(expr),
-                    negated: false,
-                    collection: Box::new(collection),
-                })
-            }
-            TokenKind::KwNot => {
-                self.advance();
-                self.expect_keyword(TokenKind::KwIn)?;
-                let collection = self.parse_additive()?;
-                Ok(Expr::Membership {
-                    expr: Box::new(expr),
-                    negated: true,
-                    collection: Box::new(collection),
-                })
-            }
-            _ => Ok(expr),
+        if self.peek_kind() == &TokenKind::KwIn {
+            self.advance();
+            let collection = self.parse_additive()?;
+            return Ok(Expr::Membership {
+                expr: Box::new(expr),
+                negated: false,
+                collection: Box::new(collection),
+            });
         }
+        if matches!(self.peek_kind(), TokenKind::Ident(n) if n == "not") {
+            self.advance(); // consume "not"
+            self.expect_keyword(TokenKind::KwIn)?;
+            let collection = self.parse_additive()?;
+            return Ok(Expr::Membership {
+                expr: Box::new(expr),
+                negated: true,
+                collection: Box::new(collection),
+            });
+        }
+        Ok(expr)
     }
 
     fn parse_additive(&mut self) -> Result<Expr> {
