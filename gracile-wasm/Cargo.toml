@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "WebAssembly bindings for the gracile templating engine"
+keywords = ["template", "wasm", "rendering"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
