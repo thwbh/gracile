@@ -183,14 +183,14 @@ dependencies = [
 
 [[package]]
 name = "gracile"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gracile-core",
 ]
 
 [[package]]
 name = "gracile-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "gracile-core",
@@ -199,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "gracile-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "insta",
  "serde",
@@ -208,7 +208,7 @@ dependencies = [
 
 [[package]]
 name = "gracile-wasm"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gracile-core",
  "js-sys",
