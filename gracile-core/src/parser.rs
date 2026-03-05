@@ -48,7 +48,7 @@ impl Parser {
                 Ok(())
             }
             other => Err(Error::ParseError {
-                message: format!("Expected '}}', got {:?}", other),
+                message: format!("Expected '}}', got {}", other),
                 span: self.peek_span(),
             }),
         }
@@ -61,7 +61,7 @@ impl Parser {
                 Ok(name)
             }
             other => Err(Error::ParseError {
-                message: format!("Expected identifier, got {:?}", other),
+                message: format!("Expected identifier, got {}", other),
                 span: self.peek_span(),
             }),
         }
@@ -74,7 +74,7 @@ impl Parser {
                 Ok(s)
             }
             other => Err(Error::ParseError {
-                message: format!("Expected string literal, got {:?}", other),
+                message: format!("Expected string literal, got {}", other),
                 span: self.peek_span(),
             }),
         }
@@ -86,7 +86,7 @@ impl Parser {
             Ok(())
         } else {
             Err(Error::ParseError {
-                message: format!("Expected {:?}, got {:?}", expected, self.peek_kind()),
+                message: format!("Expected {}, got {}", expected, self.peek_kind()),
                 span: self.peek_span(),
             })
         }
@@ -96,7 +96,7 @@ impl Parser {
         match self.peek_kind() {
             TokenKind::Eof => Ok(()),
             other => Err(Error::ParseError {
-                message: format!("Expected end of template, got {:?}", other),
+                message: format!("Expected end of template, got {}", other),
                 span: self.peek_span(),
             }),
         }
@@ -167,7 +167,7 @@ impl Parser {
 
                 other => {
                     return Err(Error::ParseError {
-                        message: format!("Unexpected token {:?}", other),
+                        message: format!("Unexpected token {}", other),
                         span: self.peek_span(),
                     });
                 }
@@ -233,7 +233,7 @@ impl Parser {
                 Ok(Node::RawBlock(body))
             }
             other => Err(Error::ParseError {
-                message: format!("Unknown block keyword {:?}", other),
+                message: format!("Unknown block keyword {}", other),
                 span: self.peek_span(),
             }),
         }
@@ -275,7 +275,7 @@ impl Parser {
                 other => {
                     return Err(Error::ParseError {
                         message: format!(
-                            "Expected {{:else}}, {{:else if}}, or {{/if}}, got {:?}",
+                            "Expected {{:else}}, {{:else if}}, or {{/if}}, got {}",
                             other
                         ),
                         span: self.peek_span(),
@@ -316,7 +316,7 @@ impl Parser {
                 }
                 other => {
                     return Err(Error::ParseError {
-                        message: format!("Expected {{:else}} or {{/each}}, got {:?}", other),
+                        message: format!("Expected {{:else}} or {{/each}}, got {}", other),
                         span: self.peek_span(),
                     });
                 }
@@ -343,7 +343,7 @@ impl Parser {
             }
             other => {
                 return Err(Error::ParseError {
-                    message: format!("Expected {{/snippet}}, got {:?}", other),
+                    message: format!("Expected {{/snippet}}, got {}", other),
                     span: self.peek_span(),
                 });
             }
@@ -389,7 +389,7 @@ impl Parser {
                 Ok(Node::DebugTag(DebugTag { expr }))
             }
             other => Err(Error::ParseError {
-                message: format!("Unknown special tag keyword {:?}", other),
+                message: format!("Unknown special tag keyword {}", other),
                 span: self.peek_span(),
             }),
         }
@@ -766,7 +766,7 @@ impl Parser {
                 Ok(Expr::Array(elements))
             }
             other => Err(Error::ParseError {
-                message: format!("Expected expression, got {:?}", other),
+                message: format!("Expected expression, got {}", other),
                 span: self.peek_span(),
             }),
         }
@@ -777,7 +777,7 @@ impl Parser {
             Ok(self.advance())
         } else {
             Err(Error::ParseError {
-                message: format!("Expected {:?}, got {:?}", kind, self.peek_kind()),
+                message: format!("Expected {}, got {}", kind, self.peek_kind()),
                 span: self.peek_span(),
             })
         }
