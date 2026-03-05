@@ -1002,6 +1002,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn include_error_names_template() {
+        let err = Engine::new()
+            .register_template("child.gtl", "{#if not valid}oops{/if}")
+            .render("{@include 'child.gtl'}", ctx(&[]))
+            .unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("child.gtl"),
+            "error should name the failing template: {msg}"
+        );
+    }
+
+    #[test]
+    fn include_error_chain() {
+        let err = Engine::new()
+            .register_template("child.gtl", "{#if not valid}oops{/if}")
+            .register_template("parent.gtl", "{@include 'child.gtl'}")
+            .render("{@include 'parent.gtl'}", ctx(&[]))
+            .unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("child.gtl"),
+            "error should name the failing template: {msg}"
+        );
+        assert!(
+            msg.contains("parent.gtl"),
+            "error should show the include chain: {msg}"
+        );
+    }
+
     // ── Filters ───────────────────────────────────────────────────────────
 
     #[test]

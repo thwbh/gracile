@@ -78,6 +78,82 @@ pub enum TokenKind {
     Eof,
 }
 
+impl std::fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            TokenKind::RawText(_) => "raw text",
+            TokenKind::RawBody(_) => "raw block content",
+            TokenKind::CommentBody(_) => "comment content",
+
+            TokenKind::BlockOpen => "'{#'",
+            TokenKind::ContinueOpen => "'{:'",
+            TokenKind::BlockClose => "'{/'",
+            TokenKind::SpecialOpen => "'{@'",
+            TokenKind::CommentOpen => "'{!'",
+            TokenKind::ExprOpen => "'{='",
+            TokenKind::ExprOpenRaw => "'{~'",
+            TokenKind::Close => "'}'",
+            TokenKind::CommentClose => "'!}'",
+
+            TokenKind::KwIf => "keyword 'if'",
+            TokenKind::KwElse => "keyword 'else'",
+            TokenKind::KwEach => "keyword 'each'",
+            TokenKind::KwAs => "keyword 'as'",
+            TokenKind::KwSnippet => "keyword 'snippet'",
+            TokenKind::KwRaw => "keyword 'raw'",
+            TokenKind::KwRender => "keyword 'render'",
+            TokenKind::KwConst => "keyword 'const'",
+            TokenKind::KwInclude => "keyword 'include'",
+            TokenKind::KwDebug => "keyword 'debug'",
+            TokenKind::KwIs => "keyword 'is'",
+            TokenKind::KwNot => "keyword 'not'",
+            TokenKind::KwIn => "keyword 'in'",
+
+            TokenKind::True => "'true'",
+            TokenKind::False => "'false'",
+            TokenKind::Null => "'null'",
+
+            TokenKind::Pipe => "'|'",
+            TokenKind::Or => "'||'",
+            TokenKind::And => "'&&'",
+            TokenKind::Question => "'?'",
+            TokenKind::NullCoalesce => "'??'",
+            TokenKind::Colon => "':'",
+            TokenKind::Eq => "'=='",
+            TokenKind::Neq => "'!='",
+            TokenKind::Assign => "'='",
+            TokenKind::Lt => "'<'",
+            TokenKind::Gt => "'>'",
+            TokenKind::Lte => "'<='",
+            TokenKind::Gte => "'>='",
+            TokenKind::Add => "'+'",
+            TokenKind::Sub => "'-'",
+            TokenKind::Mul => "'*'",
+            TokenKind::Div => "'/'",
+            TokenKind::Mod => "'%'",
+            TokenKind::Bang => "'!'",
+            TokenKind::Dot => "'.'",
+
+            TokenKind::LParen => "'('",
+            TokenKind::RParen => "')'",
+            TokenKind::LBracket => "'['",
+            TokenKind::RBracket => "']'",
+            TokenKind::LBraceD => "'{'",
+            TokenKind::RBraceD => "'}'",
+            TokenKind::Comma => "','",
+
+            TokenKind::Eof => "end of template",
+
+            // Variants with data are handled below.
+            TokenKind::StringLit(s) => return write!(f, "string '{s}'"),
+            TokenKind::IntLit(n) => return write!(f, "integer '{n}'"),
+            TokenKind::FloatLit(n) => return write!(f, "float '{n}'"),
+            TokenKind::Ident(s) => return write!(f, "'{s}'"),
+        };
+        f.write_str(s)
+    }
+}
+
 /// A lexed token with source position.
 #[derive(Debug, Clone)]
 pub struct Token {
